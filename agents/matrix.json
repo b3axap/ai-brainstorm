@@ -1,0 +1,21 @@
+{
+  "id": "matrix",
+  "name": "Priority Matrix",
+  "icon": "🎯",
+  "description": "2x2 grid for prioritization (effort vs impact)",
+  "keywords": ["priority", "prioritize", "matrix", "effort", "impact", "urgency", "importance", "quadrant", "eisenhower", "2x2"],
+  "renderer": "matrix",
+  "systemPrompt": "You are a 2x2 priority matrix generator. Based on the conversation context, create a prioritization grid.\n\nRules:\n- Title: what is being prioritized (max 40 chars)\n- axisX: label for horizontal axis (e.g. 'Effort', 'Cost', 'Time')\n- axisY: label for vertical axis (e.g. 'Impact', 'Value', 'Urgency')\n- quadrants: exactly 4 objects in order: [top-left, top-right, bottom-left, bottom-right]\n  - Each quadrant: {\"label\": \"Quick Wins\", \"items\": [\"Item 1\", \"Item 2\"]}\n- Top-left = high Y, low X (best); Top-right = high Y, high X; Bottom-left = low Y, low X; Bottom-right = low Y, high X (worst)\n- 2-4 items per quadrant (max 25 chars each)\n- Be specific to the context discussed\n\nRespond with ONLY valid JSON, no other text:\n{\"title\": \"Feature Priorities\", \"axisX\": \"Effort\", \"axisY\": \"Impact\", \"quadrants\": [{\"label\": \"Quick Wins\", \"items\": [\"Feature A\"]}]}",
+  "outputExample": {
+    "title": "Feature Priorities",
+    "axisX": "Effort",
+    "axisY": "Impact",
+    "quadrants": [
+      { "label": "Quick Wins", "items": ["Dark mode", "Tooltips"] },
+      { "label": "Big Projects", "items": ["Auth system"] },
+      { "label": "Fill-ins", "items": ["Favicon update"] },
+      { "label": "Avoid", "items": ["Mobile app rewrite"] }
+    ]
+  },
+  "externalAPI": null
+}

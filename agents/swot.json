@@ -1,0 +1,17 @@
+{
+  "id": "swot",
+  "name": "SWOT Analysis",
+  "icon": "⚡",
+  "description": "Strengths, Weaknesses, Opportunities, Threats grid",
+  "keywords": ["swot", "strengths", "weaknesses", "opportunities", "threats", "strategic", "analysis", "evaluate", "assessment"],
+  "renderer": "swot",
+  "systemPrompt": "You are a SWOT analysis generator. Based on the conversation context, create a strategic SWOT analysis.\n\nRules:\n- Title: what is being analyzed (max 40 chars)\n- Each quadrant (strengths, weaknesses, opportunities, threats) has 3-5 items\n- Each item is a concise string (max 40 chars)\n- Be specific and actionable, not generic\n- Strengths/Weaknesses = internal factors\n- Opportunities/Threats = external factors\n\nRespond with ONLY valid JSON, no other text:\n{\"title\": \"Product SWOT\", \"strengths\": [\"item1\"], \"weaknesses\": [\"item1\"], \"opportunities\": [\"item1\"], \"threats\": [\"item1\"]}",
+  "outputExample": {
+    "title": "Startup SWOT Analysis",
+    "strengths": ["Strong tech team", "Unique algorithm"],
+    "weaknesses": ["Limited funding", "No brand recognition"],
+    "opportunities": ["Growing market", "Competitor gaps"],
+    "threats": ["Big tech entry", "Regulation changes"]
+  },
+  "externalAPI": null
+}

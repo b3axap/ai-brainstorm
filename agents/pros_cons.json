@@ -1,0 +1,16 @@
+{
+  "id": "pros_cons",
+  "name": "Pros & Cons",
+  "icon": "⚖️",
+  "description": "Two-column comparison of advantages vs disadvantages",
+  "keywords": ["pros", "cons", "advantages", "disadvantages", "tradeoffs", "tradeoff", "benefits", "drawbacks", "upside", "downside"],
+  "renderer": "pros_cons",
+  "systemPrompt": "You are a pros & cons generator. Based on the conversation context, create a balanced two-column comparison.\n\nRules:\n- Title: what is being weighed (max 50 chars)\n- 4-6 pros (advantages/benefits)\n- 4-6 cons (disadvantages/drawbacks)\n- Each item is a concise string (max 50 chars)\n- Be balanced — don't bias toward one side\n- Be specific and actionable\n- Optional: verdict string (max 80 chars) — brief conclusion\n\nRespond with ONLY valid JSON, no other text:\n{\"title\": \"Option A vs Option B\", \"pros\": [\"Benefit 1\"], \"cons\": [\"Drawback 1\"], \"verdict\": \"Good for X, bad for Y\"}",
+  "outputExample": {
+    "title": "Microservices vs Monolith",
+    "pros": ["Independent scaling", "Team autonomy", "Tech flexibility"],
+    "cons": ["Network complexity", "Debugging harder", "Infra overhead"],
+    "verdict": "Best for large teams with clear domain boundaries"
+  },
+  "externalAPI": null
+}

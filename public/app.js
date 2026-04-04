@@ -202,7 +202,7 @@ function sendSidebarMessage() {
 function addSidebarMessage(message) {
   const container = document.getElementById('sidebarMessages');
   const div = document.createElement('div');
-  div.className = `sidebar-msg ${message.role === 'assistant' ? 's-system' : ''}`;
+  div.className = `sidebar-msg ${message.role === 'assistant' || message.role === 'system' ? 's-system' : ''}`;
   if (message.role === 'user') {
     div.innerHTML = `<span class="s-name">${escHtml(message.userName)}: </span><span class="s-text">${escHtml(message.content)}</span>`;
   } else {
@@ -340,7 +340,7 @@ socket.on('claude-chunk', ({ chunk }) => {
   appendStream(chunk);
 });
 
-socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, autoGenerate }) => {
+socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, autoGenerate, confidence, reasoning }) => {
   endStreaming(fullMessage);
   state.generating = false;
 
@@ -362,7 +362,7 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, autoG
     if (autoNames.length > 0) {
       const autoMsg = document.createElement('div');
       autoMsg.className = 'auto-generate-notice';
-      autoMsg.textContent = `Generating: ${autoNames.join(', ')}...`;
+      autoMsg.innerHTML = `<span class="auto-spinner"></span> Generating: ${autoNames.join(', ')}...`;
       lastMsg.appendChild(autoMsg);
 
       autoGenerate.forEach(typeId => {
@@ -413,18 +413,29 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, autoG
         sLabel.textContent = hasAuto ? 'Also available:' : (hasQuestions ? '\u2728 Or generate right away:' : '\u2728 Suggested visualizations:');
         actionsDiv.appendChild(sLabel);
 
+        // Show reasoning if available
+        if (reasoning && !hasAuto) {
+          const reasonDiv = document.createElement('div');
+          reasonDiv.className = 'suggest-reasoning';
+          reasonDiv.textContent = reasoning;
+          actionsDiv.appendChild(reasonDiv);
+        }
+
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'suggest-buttons';
-        remainingTypes.forEach(typeId => {
+        remainingTypes.forEach((typeId, idx) => {
           const agent = state.agents.find(a => a.id === typeId);
           if (!agent) return;
           const btn = document.createElement('button');
-          btn.className = 'suggest-btn';
+          // First suggestion is highlighted if confidence is decent
+          const isTop = idx === 0 && confidence >= 0.6 && !hasAuto;
+          btn.className = `suggest-btn${isTop ? ' suggest-btn-top' : ''}`;
           btn.innerHTML = `${agent.icon} ${agent.name}`;
           btn.onclick = () => {
             if (state.generating) return;
             state.generating = true;
             buttonsDiv.querySelectorAll('.suggest-btn').forEach(b => b.disabled = true);
+            btn.innerHTML = `<span class="auto-spinner"></span> ${agent.name}...`;
             socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
             showToast(`Generating ${agent.name}...`);
           };
@@ -448,11 +459,24 @@ socket.on('artifact-created', ({ artifact }) => {
   state.artifacts.push(artifact);
   state.generating = false;
   renderArtifactCard(artifact);
-  showToast(`${artifact.icon} ${artifact.title} created!`);
+
+  // Remove any auto-generate notices for this type
+  document.querySelectorAll('.auto-generate-notice').forEach(el => {
+    el.innerHTML = `<span style="color:var(--green);">&#10003;</span> ${artifact.icon} ${escHtml(artifact.title)} created!`;
+    el.style.animation = 'none';
+    setTimeout(() => el.remove(), 3000);
+  });
+
+  // Show toast with option to view on canvas
+  if (state.screen === 'chat') {
+    showToast(`${artifact.icon} ${artifact.title} created! Click "Canvas" to view.`);
+  } else {
+    showToast(`${artifact.icon} ${artifact.title} created!`);
+  }
 
   // Auto-switch to canvas on first artifact
   if (state.artifacts.length === 1 && state.screen === 'chat') {
-    setTimeout(() => showScreen('canvas'), 500);
+    setTimeout(() => showScreen('canvas'), 800);
   }
 });
 

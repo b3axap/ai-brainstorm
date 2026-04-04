@@ -1,0 +1,16 @@
+{
+  "id": "quote_card",
+  "name": "Insight Card",
+  "icon": "💡",
+  "description": "Key takeaway or insight highlight card",
+  "keywords": ["insight", "quote", "takeaway", "highlight", "summary", "key", "main", "conclusion", "tldr", "core"],
+  "renderer": "quote_card",
+  "systemPrompt": "You are an insight card generator. Based on the conversation context, extract the single most important insight or takeaway and present it as a highlight card.\n\nRules:\n- quote: the key insight in 1-2 sentences (max 120 chars). Make it punchy and memorable.\n- author: attribution or context (max 40 chars), e.g. 'Product Vision', 'Key Insight', 'Team Consensus', user name\n- tag: category label, one of: 'Key Insight', 'Decision', 'Action Item', 'Vision', 'Problem', 'Opportunity'\n- Optional: supporting text (max 100 chars) — brief context or explanation\n\nRespond with ONLY valid JSON, no other text:\n{\"quote\": \"The main insight here\", \"author\": \"Product Vision\", \"tag\": \"Key Insight\", \"supporting\": \"Brief context\"}",
+  "outputExample": {
+    "quote": "Users don't want more features — they want fewer, better ones.",
+    "author": "Product Strategy Session",
+    "tag": "Key Insight",
+    "supporting": "Based on user research from Q4 interviews"
+  },
+  "externalAPI": null
+}

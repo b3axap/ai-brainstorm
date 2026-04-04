@@ -1,0 +1,18 @@
+{
+  "id": "kanban",
+  "name": "Kanban Board",
+  "icon": "📋",
+  "description": "Task board with status columns",
+  "keywords": ["kanban", "tasks", "board", "organize", "status", "todo", "backlog", "sprint", "work", "track"],
+  "renderer": "kanban",
+  "systemPrompt": "You are a Kanban board generator. Based on the conversation context, create a task board organized by status.\n\nRules:\n- Title: what this board tracks (max 40 chars)\n- Exactly 3 columns: 'To Do', 'In Progress', 'Done'\n- Each column has 2-5 cards\n- Each card: {\"title\": \"Task name (max 30 chars)\", \"tag\": \"category (max 15 chars)\"}\n- Distribute cards realistically across columns\n- Tags can be: feature, bug, research, design, infra, docs\n- Be specific to the conversation context\n\nRespond with ONLY valid JSON, no other text:\n{\"title\": \"Sprint Board\", \"columns\": [{\"name\": \"To Do\", \"cards\": [{\"title\": \"Task\", \"tag\": \"feature\"}]}]}",
+  "outputExample": {
+    "title": "Feature Backlog",
+    "columns": [
+      { "name": "To Do", "cards": [{ "title": "Add auth", "tag": "feature" }] },
+      { "name": "In Progress", "cards": [{ "title": "Fix login bug", "tag": "bug" }] },
+      { "name": "Done", "cards": [{ "title": "Setup CI/CD", "tag": "infra" }] }
+    ]
+  },
+  "externalAPI": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "checklist",
+  "name": "Checklist",
+  "icon": "✅",
+  "description": "Actionable step-by-step task list with progress",
+  "keywords": ["checklist", "action", "items", "steps", "todo", "list", "launch", "requirements", "plan", "do"],
+  "renderer": "checklist",
+  "systemPrompt": "You are a checklist generator. Based on the conversation context, create an actionable task list.\n\nRules:\n- Title: what this checklist is for (max 50 chars)\n- 6-12 items in logical order\n- Each item: {\"text\": \"Task description (max 60 chars)\", \"done\": true/false}\n- Mark first 30-60% as done (to show progress — the brainstorming itself is progress)\n- Group related items together\n- Be specific and actionable — each item should be a clear task\n- Optional: category string on each item for grouping\n\nRespond with ONLY valid JSON, no other text:\n{\"title\": \"Launch Checklist\", \"items\": [{\"text\": \"Set up database\", \"done\": true}, {\"text\": \"Write tests\", \"done\": false}]}",
+  "outputExample": {
+    "title": "MVP Launch Checklist",
+    "items": [
+      { "text": "Define core features", "done": true },
+      { "text": "Set up project structure", "done": true },
+      { "text": "Build authentication", "done": false },
+      { "text": "Write integration tests", "done": false }
+    ]
+  },
+  "externalAPI": null
+}

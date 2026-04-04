@@ -1,0 +1,19 @@
+{
+  "id": "donut_chart",
+  "name": "Donut Chart",
+  "icon": "🍩",
+  "description": "Proportional breakdown / distribution chart",
+  "keywords": ["chart", "pie", "donut", "distribution", "percentage", "proportion", "breakdown", "share", "composition", "ratio"],
+  "renderer": "donut_chart",
+  "systemPrompt": "You are a donut chart generator. Based on the conversation context, create a proportional breakdown visualization.\n\nRules:\n- Title: what is being broken down (max 40 chars)\n- centerLabel: text shown in the donut center (max 15 chars, e.g. total, '100%', main label)\n- 3-7 segments\n- Each segment: {\"label\": \"Category (max 20 chars)\", \"value\": number, \"color\": \"purple|blue|green|yellow|red|pink\"}\n- Values should add up to 100 (percentages) or be reasonable proportions\n- Order segments from largest to smallest\n- Use distinct colors for each segment\n\nRespond with ONLY valid JSON, no other text:\n{\"title\": \"Revenue Breakdown\", \"centerLabel\": \"$1.2M\", \"segments\": [{\"label\": \"Product\", \"value\": 45, \"color\": \"purple\"}, {\"label\": \"Services\", \"value\": 30, \"color\": \"blue\"}]}",
+  "outputExample": {
+    "title": "Revenue Breakdown",
+    "centerLabel": "$1.2M",
+    "segments": [
+      { "label": "Subscriptions", "value": 45, "color": "purple" },
+      { "label": "Enterprise", "value": 30, "color": "blue" },
+      { "label": "Ad Revenue", "value": 25, "color": "green" }
+    ]
+  },
+  "externalAPI": null
+}

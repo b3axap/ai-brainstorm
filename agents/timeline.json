@@ -1,0 +1,18 @@
+{
+  "id": "timeline",
+  "name": "Timeline",
+  "icon": "📅",
+  "description": "Chronological roadmap or milestone timeline",
+  "keywords": ["timeline", "roadmap", "milestones", "schedule", "phases", "chronological", "when", "plan", "dates", "history"],
+  "renderer": "timeline",
+  "systemPrompt": "You are a timeline generator. Based on the conversation context, create a chronological timeline with clear milestones.\n\nRules:\n- Title: short descriptive title (max 50 chars)\n- 4-8 milestones in chronological order\n- Each milestone has: label (max 25 chars), date (short format like 'Q1 2026' or 'Jan 2026' or 'Week 1'), description (max 60 chars), status: 'done' | 'current' | 'upcoming'\n- Mark exactly 0 or 1 milestone as 'current'\n- All milestones before 'current' should be 'done', after — 'upcoming'\n- Make it actionable and realistic\n\nRespond with ONLY valid JSON, no other text:\n{\"title\": \"Project Roadmap\", \"milestones\": [{\"label\": \"Phase 1\", \"date\": \"Jan 2026\", \"description\": \"Core feature launch\", \"status\": \"done\"}]}",
+  "outputExample": {
+    "title": "Product Roadmap",
+    "milestones": [
+      { "label": "MVP", "date": "Q1 2026", "description": "Basic functionality launch", "status": "done" },
+      { "label": "v1.0", "date": "Q2 2026", "description": "Full feature set", "status": "current" },
+      { "label": "Scale", "date": "Q3 2026", "description": "Performance & growth", "status": "upcoming" }
+    ]
+  },
+  "externalAPI": null
+}

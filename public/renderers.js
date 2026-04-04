@@ -8,7 +8,15 @@ const renderers = {
   diagram: renderDiagram,
   html_guide: renderHTMLGuide,
   image: renderImage,
-  freeform: renderFreeform
+  freeform: renderFreeform,
+  timeline: renderTimeline,
+  swot: renderSWOT,
+  kanban: renderKanban,
+  pros_cons: renderProsCons,
+  matrix: renderMatrix,
+  checklist: renderChecklist,
+  donut_chart: renderDonutChart,
+  quote_card: renderQuoteCard
 };
 
 function renderArtifact(type, data, container) {
@@ -216,19 +224,277 @@ function renderImage(data, container) {
 
 // --- FREEFORM ---
 function renderFreeform(data, container) {
-  const html = data.html || '<p>No content</p>';
+  if (!data.html || data.html.length < 20) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Failed to generate visualization. Try again.</div>';
+    return;
+  }
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'freeform-wrapper';
+
   const iframe = document.createElement('iframe');
   iframe.className = 'freeform-iframe';
   iframe.sandbox = 'allow-scripts';
-  container.innerHTML = '';
-  container.appendChild(iframe);
-  iframe.srcdoc = html;
+
+  // Error boundary: show fallback if iframe fails to render content
+  const errorTimeout = setTimeout(() => {
+    try {
+      if (!iframe.contentDocument || !iframe.contentDocument.body || iframe.contentDocument.body.innerHTML.length < 10) {
+        wrapper.innerHTML = '<div style="color:var(--text2);padding:20px;">Visualization failed to render.</div>';
+      }
+    } catch {}
+  }, 5000);
+
   iframe.onload = () => {
+    clearTimeout(errorTimeout);
     try {
       const h = iframe.contentDocument.body.scrollHeight;
-      if (h > 50) iframe.style.height = Math.min(h + 20, 600) + 'px';
+      if (h > 50) iframe.style.height = Math.min(h + 20, 700) + 'px';
     } catch {}
   };
+
+  wrapper.appendChild(iframe);
+  container.innerHTML = '';
+  container.appendChild(wrapper);
+  iframe.srcdoc = data.html;
+}
+
+// --- TIMELINE ---
+function renderTimeline(data, container) {
+  if (!data.milestones || !data.milestones.length) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid timeline data</div>';
+    return;
+  }
+  const ms = data.milestones;
+  const statusColors = { done: 'var(--green)', current: 'var(--accent)', upcoming: 'var(--text2)' };
+
+  let html = '<div class="timeline-container">';
+  if (data.title) html += `<div class="timeline-title">${escapeHtml(data.title)}</div>`;
+  html += '<div class="timeline-track">';
+
+  ms.forEach((m, i) => {
+    const color = statusColors[m.status] || 'var(--text2)';
+    const filled = m.status === 'done' || m.status === 'current';
+    const isCurrent = m.status === 'current';
+    html += `
+      <div class="tl-item ${m.status}">
+        <div class="tl-dot" style="border-color:${color};${filled ? `background:${color}` : ''}${isCurrent ? ';box-shadow:0 0 8px ' + color : ''}"></div>
+        ${i < ms.length - 1 ? `<div class="tl-line" style="background:${m.status === 'done' ? 'var(--green)' : 'var(--border)'}"></div>` : ''}
+        <div class="tl-content">
+          <div class="tl-label" style="color:${color}">${escapeHtml(m.label || '')}</div>
+          <div class="tl-date">${escapeHtml(m.date || '')}</div>
+          <div class="tl-desc">${escapeHtml(m.description || '')}</div>
+        </div>
+      </div>`;
+  });
+
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+// --- SWOT ---
+function renderSWOT(data, container) {
+  if (!data.strengths) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid SWOT data</div>';
+    return;
+  }
+
+  const quads = [
+    { key: 'strengths', label: 'Strengths', color: 'var(--green)', icon: '💪' },
+    { key: 'weaknesses', label: 'Weaknesses', color: 'var(--red)', icon: '⚠️' },
+    { key: 'opportunities', label: 'Opportunities', color: 'var(--blue)', icon: '🚀' },
+    { key: 'threats', label: 'Threats', color: 'var(--orange)', icon: '🔥' }
+  ];
+
+  let html = '<div class="swot-grid">';
+  quads.forEach(q => {
+    const items = data[q.key] || [];
+    html += `<div class="swot-quad" style="border-color:${q.color}20">
+      <div class="swot-header" style="color:${q.color}">${q.icon} ${q.label}</div>
+      <ul class="swot-list">${items.map(it => `<li><span class="swot-bullet" style="background:${q.color}"></span>${escapeHtml(it)}</li>`).join('')}</ul>
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// --- KANBAN ---
+function renderKanban(data, container) {
+  if (!data.columns) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid kanban data</div>';
+    return;
+  }
+
+  const colColors = { 'To Do': 'var(--red)', 'In Progress': 'var(--orange)', 'Done': 'var(--green)' };
+  const tagColors = { feature: 'var(--accent)', bug: 'var(--red)', research: 'var(--blue)', design: 'var(--pink)', infra: 'var(--orange)', docs: 'var(--green)' };
+
+  let html = '<div class="kanban-board">';
+  data.columns.forEach(col => {
+    const color = colColors[col.name] || 'var(--accent)';
+    html += `<div class="kanban-col">
+      <div class="kanban-col-header" style="border-bottom-color:${color}">
+        <span style="color:${color}">${escapeHtml(col.name)}</span>
+        <span class="kanban-count" style="background:${color}20;color:${color}">${(col.cards || []).length}</span>
+      </div>
+      <div class="kanban-cards">`;
+    (col.cards || []).forEach(card => {
+      const tc = tagColors[card.tag] || 'var(--text2)';
+      html += `<div class="kanban-card">
+        <div class="kanban-card-title">${escapeHtml(card.title)}</div>
+        ${card.tag ? `<span class="kanban-tag" style="background:${tc}20;color:${tc}">${escapeHtml(card.tag)}</span>` : ''}
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// --- PROS & CONS ---
+function renderProsCons(data, container) {
+  if (!data.pros || !data.cons) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid pros/cons data</div>';
+    return;
+  }
+
+  let html = '<div class="proscons-container">';
+  if (data.title) html += `<div class="proscons-title">${escapeHtml(data.title)}</div>`;
+  html += '<div class="proscons-grid">';
+
+  html += '<div class="proscons-col pros"><div class="proscons-header" style="color:var(--green)">✓ Pros</div>';
+  data.pros.forEach(p => { html += `<div class="proscons-item"><span class="pc-icon" style="color:var(--green)">+</span>${escapeHtml(p)}</div>`; });
+  html += '</div>';
+
+  html += '<div class="proscons-col cons"><div class="proscons-header" style="color:var(--red)">✗ Cons</div>';
+  data.cons.forEach(c => { html += `<div class="proscons-item"><span class="pc-icon" style="color:var(--red)">−</span>${escapeHtml(c)}</div>`; });
+  html += '</div>';
+
+  html += '</div>';
+  if (data.verdict) html += `<div class="proscons-verdict">${escapeHtml(data.verdict)}</div>`;
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// --- MATRIX 2x2 ---
+function renderMatrix(data, container) {
+  if (!data.quadrants || data.quadrants.length < 4) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid matrix data</div>';
+    return;
+  }
+
+  const colors = ['var(--green)', 'var(--blue)', 'var(--orange)', 'var(--red)'];
+  const positions = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+
+  let html = '<div class="matrix-container">';
+  html += `<div class="matrix-axis-y"><span>↑ ${escapeHtml(data.axisY || 'Impact')}</span></div>`;
+  html += '<div class="matrix-grid">';
+
+  data.quadrants.forEach((q, i) => {
+    html += `<div class="matrix-quad ${positions[i]}" style="border-color:${colors[i]}30">
+      <div class="matrix-quad-label" style="color:${colors[i]}">${escapeHtml(q.label)}</div>
+      <div class="matrix-items">${(q.items || []).map(it =>
+        `<span class="matrix-chip" style="background:${colors[i]}15;border-color:${colors[i]}40;color:${colors[i]}">${escapeHtml(it)}</span>`
+      ).join('')}</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  html += `<div class="matrix-axis-x">${escapeHtml(data.axisX || 'Effort')} →</div>`;
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// --- CHECKLIST ---
+function renderChecklist(data, container) {
+  if (!data.items) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid checklist data</div>';
+    return;
+  }
+
+  const doneCount = data.items.filter(i => i.done).length;
+  const total = data.items.length;
+  const pct = Math.round((doneCount / total) * 100);
+
+  let html = '<div class="checklist-container">';
+  if (data.title) html += `<div class="checklist-title">${escapeHtml(data.title)}</div>`;
+  html += `<div class="checklist-progress">
+    <div class="checklist-bar"><div class="checklist-bar-fill" style="width:${pct}%"></div></div>
+    <span class="checklist-count">${doneCount} / ${total}</span>
+  </div>`;
+
+  data.items.forEach(item => {
+    html += `<div class="checklist-item ${item.done ? 'done' : ''}">
+      <div class="checklist-check">${item.done ? '✓' : ''}</div>
+      <span class="checklist-text">${escapeHtml(item.text)}</span>
+    </div>`;
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// --- DONUT CHART ---
+function renderDonutChart(data, container) {
+  if (!data.segments || !data.segments.length) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid chart data</div>';
+    return;
+  }
+
+  const colorMap = {
+    purple: '#6c5ce7', blue: '#74b9ff', green: '#00cec9',
+    yellow: '#fdcb6e', red: '#ff6b6b', pink: '#fd79a8', orange: '#e17055'
+  };
+
+  const total = data.segments.reduce((sum, s) => sum + s.value, 0);
+  const size = 160, cx = size / 2, cy = size / 2, r = 60, strokeW = 20;
+  const circumference = 2 * Math.PI * r;
+
+  let offset = 0;
+  let arcs = '';
+  data.segments.forEach(seg => {
+    const pct = seg.value / total;
+    const dashLen = pct * circumference;
+    const color = colorMap[seg.color] || seg.color || '#6c5ce7';
+    arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+      stroke="${color}" stroke-width="${strokeW}"
+      stroke-dasharray="${dashLen} ${circumference - dashLen}"
+      stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += dashLen;
+  });
+
+  let legend = data.segments.map(seg => {
+    const color = colorMap[seg.color] || seg.color || '#6c5ce7';
+    const pct = Math.round((seg.value / total) * 100);
+    return `<div class="donut-legend-item">
+      <span class="donut-legend-dot" style="background:${color}"></span>
+      <span class="donut-legend-label">${escapeHtml(seg.label)}</span>
+      <span class="donut-legend-value" style="color:${color}">${pct}%</span>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `<div class="donut-container">
+    <div class="donut-chart">
+      <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${arcs}</svg>
+      <div class="donut-center">${escapeHtml(data.centerLabel || '')}</div>
+    </div>
+    <div class="donut-legend">${legend}</div>
+  </div>`;
+}
+
+// --- QUOTE / INSIGHT CARD ---
+function renderQuoteCard(data, container) {
+  if (!data.quote) {
+    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid quote data</div>';
+    return;
+  }
+
+  container.innerHTML = `<div class="quote-container">
+    ${data.tag ? `<span class="quote-tag">${escapeHtml(data.tag)}</span>` : ''}
+    <div class="quote-mark">"</div>
+    <div class="quote-text">${escapeHtml(data.quote)}</div>
+    ${data.author ? `<div class="quote-author">— ${escapeHtml(data.author)}</div>` : ''}
+    ${data.supporting ? `<div class="quote-supporting">${escapeHtml(data.supporting)}</div>` : ''}
+  </div>`;
 }
 
 // --- Utility ---

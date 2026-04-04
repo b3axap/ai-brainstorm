@@ -2,7 +2,7 @@ try { require('dotenv/config'); } catch(e) { /* dotenv optional, Replit uses Sec
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { getAgent, getAllAgents, getAgentSummaries } = require('./agents');
+const { getAgent, getAgentSummaries } = require('./agents');
 
 const app = express();
 const server = http.createServer(app);
@@ -85,28 +85,52 @@ ${isFirstMessage ? `This is the user's FIRST message about their idea. Follow th
 
 3. **VISUALIZATION SUGGESTIONS** — Always suggest 2-3 visualization types that would be most useful at this stage.` : `This is a follow-up message in an ongoing conversation. Respond naturally and helpfully. Do NOT repeat the summary — just address what the user said and move the brainstorm forward. Always suggest 2-3 visualization types.`}
 
-Available visualization types:
+AVAILABLE VISUALIZATION TYPES (catalog):
 ${agentList}
 
-CRITICAL: End your response with a single JSON block on its own line. The JSON must include:
-- "suggest": array of 2-3 agent IDs (ALWAYS required) — these are your recommended visualizations
-- "questions": array of 0-3 clarifying questions (include only if you have questions, omit if 0)
-- "auto": array of agent IDs to auto-generate immediately (optional). Use this when the idea is clear enough and you're confident these visualizations would be valuable. For example, a mind map is almost always useful for a first brainstorm. Can include 1-3 items.
+HYBRID VISUALIZATION SYSTEM:
+You have two modes for creating visualizations:
 
-Example — first message, idea is vague:
-{"questions": ["Who is the target audience?", "What's the main differentiator?"], "suggest": ["mindmap", "table"]}
+1. **Catalog mode** (preferred) — Use one of the available types listed above. Fast, reliable, consistent.
+2. **Freeform mode** — When NO catalog type fits well, use "freeform" to generate a custom HTML visualization. Use this for:
+   - Unique comparisons, calculators, or interactive widgets
+   - Visualizations that don't map to any catalog type
+   - When the user explicitly asks for something creative/custom
 
-Example — idea is clear, auto-generate a mind map:
-{"suggest": ["mindmap", "presentation", "diagram"], "auto": ["mindmap"]}
+CHOOSING THE RIGHT VISUALIZATION:
+Think about WHAT the user needs, not just what they said:
+- Comparing options? → table, pros_cons, matrix, or freeform comparison
+- Breaking down a concept? → mindmap
+- Planning phases? → timeline, kanban
+- Analyzing strengths/weaknesses? → swot, pros_cons
+- Showing proportions? → donut_chart
+- Process or flow? → diagram
+- Need something totally custom? → freeform
+- Quick insight or key takeaway? → quote_card
 
-Example — detailed idea, auto-generate multiple:
-{"suggest": ["mindmap", "table", "diagram"], "auto": ["mindmap", "table"]}
+CRITICAL: End your response with a single JSON block on its own line:
+- "suggest": array of 2-3 agent IDs — your recommended visualizations, BEST first
+- "confidence": number 0.0-1.0 — how confident you are that the FIRST suggestion is the right one
+- "reasoning": string — one sentence explaining WHY the first suggestion fits best
+- "questions": array of 0-3 clarifying questions (omit if 0)
+- "auto": array of agent IDs to auto-generate immediately (when confidence >= 0.8)
+
+Examples:
+{"suggest": ["mindmap", "table"], "confidence": 0.9, "reasoning": "First brainstorm — mind map gives the best overview of all aspects", "auto": ["mindmap"]}
+
+{"suggest": ["pros_cons", "table", "freeform"], "confidence": 0.85, "reasoning": "User is comparing two options — pros/cons is the clearest format", "auto": ["pros_cons"]}
+
+{"suggest": ["freeform", "diagram"], "confidence": 0.7, "reasoning": "User wants an interactive calculator — no catalog type fits, freeform is best"}
+
+{"questions": ["Who is the target audience?"], "suggest": ["mindmap", "swot"], "confidence": 0.6, "reasoning": "Idea is vague — mind map can help structure, but need more context first"}
 
 Rules:
 - The JSON block must be the LAST thing in your response, on its own line.
-- ALWAYS include "suggest" with 2-3 agent IDs.
-- In your text response, briefly explain WHY you recommend these specific visualization types (1 sentence each).
-- "auto" should only include visualizations you're highly confident about. When in doubt, let the user choose.
+- ALWAYS include "suggest" with 2-3 agent IDs, best first.
+- ALWAYS include "confidence" (0.0-1.0) for your top suggestion.
+- "auto" should include items only when confidence >= 0.8.
+- Prefer catalog types over freeform when a good match exists.
+- Use freeform for genuinely unique visualizations, not as a lazy default.
 - Keep your text response concise and focused. No fluff.
 - Use Russian language if the user writes in Russian.`;
 
@@ -127,10 +151,12 @@ Rules:
 
     await stream.finalMessage();
 
-    // Parse JSON block at end (unified format with suggest + optional questions + optional auto)
+    // Parse JSON block at end (unified format with suggest + confidence + optional questions + optional auto)
     let suggestedTypes = [];
     let clarifyQuestions = [];
     let autoGenerate = [];
+    let confidence = 0;
+    let reasoning = '';
 
     const jsonMatch = fullResponse.match(/\{[^{}]*"suggest"\s*:\s*\[[^\]]*\][^{}]*\}/);
     if (jsonMatch) {
@@ -139,6 +165,8 @@ Rules:
         suggestedTypes = parsed.suggest || [];
         clarifyQuestions = parsed.questions || [];
         autoGenerate = parsed.auto || [];
+        confidence = parsed.confidence || 0;
+        reasoning = parsed.reasoning || '';
       } catch (e) { /* ignore parse error */ }
     } else {
       // Fallback: try separate patterns for backward compatibility
@@ -169,7 +197,9 @@ Rules:
       fullMessage: cleanResponse,
       suggestedTypes: suggestedTypes,
       clarifyQuestions: clarifyQuestions,
-      autoGenerate: autoGenerate
+      autoGenerate: autoGenerate,
+      confidence: confidence,
+      reasoning: reasoning
     });
 
   } catch (error) {
