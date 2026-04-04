@@ -231,14 +231,7 @@ class InteractiveEngine {
   attachAddHandlers() {
     const els = this.body.querySelectorAll('[data-add]');
     els.forEach(el => {
-      // Don't add button if already exists
-      if (el.querySelector('.bs-add-btn')) return;
-
-      const btn = document.createElement('button');
-      btn.className = 'bs-add-btn';
-      btn.textContent = '+';
-      btn.title = 'Add item';
-      btn.addEventListener('click', (e) => {
+      const doAdd = (e) => {
         e.stopPropagation();
         e.preventDefault();
         const arrayPath = el.dataset.add;
@@ -249,9 +242,23 @@ class InteractiveEngine {
           template = '';
         }
         this.emitArrayOp('insert', arrayPath, template);
-      });
-      el.style.position = 'relative';
-      el.appendChild(btn);
+      };
+
+      // If it's a bs-add-zone, the whole element is the click target
+      if (el.classList.contains('bs-add-zone') || el.classList.contains('bs-svg-add')) {
+        el.addEventListener('click', doAdd);
+        this._listeners.push([el, 'click', doAdd]);
+      } else {
+        // For other elements, append a small "+" button
+        if (el.querySelector('.bs-add-btn')) return;
+        const btn = document.createElement('button');
+        btn.className = 'bs-add-btn';
+        btn.textContent = '+';
+        btn.title = 'Add item';
+        btn.addEventListener('click', doAdd);
+        el.style.position = 'relative';
+        el.appendChild(btn);
+      }
     });
   }
 
@@ -259,11 +266,14 @@ class InteractiveEngine {
   attachDeleteHandlers() {
     const els = this.body.querySelectorAll('[data-delete]');
     els.forEach(el => {
+      // Skip SVG elements — can't append HTML buttons to SVG <g>
+      if (el instanceof SVGElement) return;
+
       if (el.querySelector('.bs-delete-btn')) return;
 
       const btn = document.createElement('button');
       btn.className = 'bs-delete-btn';
-      btn.textContent = '×';
+      btn.textContent = '\u00d7';
       btn.title = 'Remove';
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
