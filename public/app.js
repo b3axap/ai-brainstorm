@@ -555,6 +555,8 @@ function renderArtifactCard(artifact) {
   const card = document.createElement('div');
   card.className = 'artifact-card';
   card.id = `artifact-${artifact.id}`;
+  card.tabIndex = 0;
+  card.setAttribute('aria-label', `${artifact.icon || ''} ${artifact.title}`);
   card.style.left = artifact.position.x + 'px';
   card.style.top = artifact.position.y + 'px';
 
@@ -566,6 +568,7 @@ function renderArtifactCard(artifact) {
       <button class="art-action-btn" data-action="ask" title="Ask about this">? Ask</button>
       <button class="art-action-btn" data-action="copy" title="Copy data to clipboard">⎘ Copy</button>
       <button class="art-action-btn" data-action="screenshot" title="Save as PNG">📷 PNG</button>
+      <button class="art-action-btn art-action-danger" data-action="delete" title="Delete artifact">🗑</button>
     </div>
     <div class="artifact-head">
       <span class="a-icon">${artifact.icon || '📄'}</span>
@@ -662,6 +665,17 @@ function setupArtifactActions(card, artifact) {
       document.head.appendChild(script);
     } else {
       captureArtifactPNG(card, artifact);
+    }
+  };
+
+  // Delete artifact
+  card.querySelector('[data-action="delete"]').onclick = (e) => {
+    e.stopPropagation();
+    if (confirm(`Delete "${artifact.title}"?`)) {
+      socket.emit('delete-artifact', { roomId: state.roomId, artifactId: artifact.id });
+      state.artifacts = state.artifacts.filter(a => a.id !== artifact.id);
+      card.remove();
+      showToast('Artifact deleted');
     }
   };
 
@@ -1048,6 +1062,12 @@ socket.on('artifact-moved', ({ artifactId, position }) => {
   if (art) art.position = position;
 });
 
+socket.on('artifact-deleted', ({ artifactId }) => {
+  state.artifacts = state.artifacts.filter(a => a.id !== artifactId);
+  const card = document.getElementById(`artifact-${artifactId}`);
+  if (card) card.remove();
+});
+
 socket.on('generation-error', ({ message }) => {
   state.generating = false;
   showToast('Error: ' + message);
@@ -1265,6 +1285,22 @@ document.getElementById('artifactExpandModal').addEventListener('click', (e) => 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.getElementById('artifactExpandModal').classList.contains('active')) {
     closeArtifactExpand();
+  }
+
+  // Delete key on focused artifact card
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.closest('input, textarea, [contenteditable]')) {
+    const focused = document.activeElement;
+    const card = focused && focused.closest('.artifact-card');
+    if (card) {
+      const artId = card.id.replace('artifact-', '');
+      const art = state.artifacts.find(a => a.id === artId);
+      if (art && confirm(`Delete "${art.title}"?`)) {
+        socket.emit('delete-artifact', { roomId: state.roomId, artifactId: art.id });
+        state.artifacts = state.artifacts.filter(a => a.id !== art.id);
+        card.remove();
+        showToast('Artifact deleted');
+      }
+    }
   }
 });
 

@@ -794,6 +794,15 @@ io.on('connection', (socket) => {
   });
 
   // --- Execute canvas action from Claude's suggestion ---
+  socket.on('delete-artifact', ({ roomId, artifactId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const idx = room.artifacts.findIndex(a => a.id === artifactId);
+    if (idx === -1) return;
+    room.artifacts.splice(idx, 1);
+    io.to(roomId).emit('artifact-deleted', { artifactId });
+  });
+
   socket.on('execute-canvas-action', async ({ roomId, canvasAction }) => {
     const room = rooms[roomId];
     if (!room || !canvasAction) return;

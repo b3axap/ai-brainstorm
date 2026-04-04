@@ -12,6 +12,7 @@
 | `artifact-data-patch` | `{ roomId, artifactId, patch: {path, value} }` | Inline edit: scalar value at dot-path. |
 | `artifact-array-op` | `{ roomId, artifactId, op: {type, path, value?, toPath?} }` | Array ops: `insert` / `remove` / `move`. See [interactivity.md](interactivity.md). |
 | `execute-canvas-action` | `{ roomId, canvasAction }` | Execute Claude's suggested canvas action. |
+| `delete-artifact` | `{ roomId, artifactId }` | Delete artifact from room. Broadcasts `artifact-deleted` to all users. |
 
 ## Server → Client
 
@@ -29,6 +30,7 @@
 | `artifact-created` | `{ roomId, artifact }` | New artifact for canvas. |
 | `artifact-updated` | `{ roomId, artifactId, data, title }` | Re-render artifact (expand/transform/ask/inline edit). |
 | `artifact-moved` | `{ artifactId, position }` | Position sync from other user. |
+| `artifact-deleted` | `{ artifactId }` | Artifact removed — delete card from canvas. |
 | `generation-error` | `{ roomId, message }` | Error (sent to requesting user only). |
 
 ## In-Memory Data Model
