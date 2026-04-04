@@ -101,7 +101,17 @@ function sendChatMessage() {
   if (!content || state.generating) return;
   input.value = '';
   closeMentionDropdown();
-  socket.emit('send-message', { roomId: state.roomId, content });
+
+  const isNewIdea = state.newIdeaMode || false;
+  socket.emit('send-message', { roomId: state.roomId, content, isNewIdea });
+
+  // Reset new-idea mode after sending
+  if (state.newIdeaMode) {
+    state.newIdeaMode = false;
+    input.placeholder = 'Describe your idea...';
+    input.closest('.chat-input').classList.remove('new-idea-mode');
+    document.getElementById('newIdeaBtn').classList.remove('active');
+  }
 }
 
 function addChatMessage(message) {
@@ -211,8 +221,30 @@ function endStreaming(fullMessage) {
   };
 })();
 
+// --- Chat Action Buttons ---
+document.getElementById('attachBtn').onclick = () => {
+  showToast('File upload coming soon');
+};
+
+document.getElementById('newIdeaBtn').onclick = () => {
+  state.newIdeaMode = !state.newIdeaMode;
+  const chatInput = document.getElementById('chatInput');
+  const chatInputContainer = chatInput.closest('.chat-input');
+  const btn = document.getElementById('newIdeaBtn');
+
+  if (state.newIdeaMode) {
+    chatInput.placeholder = 'Describe your new idea...';
+    chatInputContainer.classList.add('new-idea-mode');
+    btn.classList.add('active');
+    chatInput.focus();
+  } else {
+    chatInput.placeholder = 'Describe your idea...';
+    chatInputContainer.classList.remove('new-idea-mode');
+    btn.classList.remove('active');
+  }
+};
+
 // --- Visualization Picker Modal ---
-document.getElementById('newVizBtn').onclick = () => openVizPicker([]);
 document.getElementById('vizCancelBtn').onclick = closeVizPicker;
 document.getElementById('vizPickerModal').onclick = (e) => {
   if (e.target.id === 'vizPickerModal') closeVizPicker();
@@ -444,6 +476,18 @@ function renderArtifactCard(artifact) {
   `;
 
   document.getElementById('canvasContent').appendChild(card);
+
+  // Bring to front on click
+  card.addEventListener('mousedown', () => {
+    document.querySelectorAll('.artifact-card').forEach(c => {
+      if (c !== card) c.style.zIndex = Math.min(parseInt(c.style.zIndex) || 1, 10);
+    });
+    card.style.zIndex = 50;
+  });
+
+  // Hide empty state
+  const emptyEl = document.getElementById('canvasEmpty');
+  if (emptyEl) emptyEl.style.display = 'none';
 
   // Render content
   const body = document.getElementById(`abody-${artifact.id}`);

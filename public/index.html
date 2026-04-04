@@ -38,7 +38,6 @@
     <span class="room-code" id="roomCode" title="Click to copy">---</span>
     <span class="users-list" id="usersList"></span>
     <span class="spacer"></span>
-    <button class="btn" id="newVizBtn">+ New Visualization</button>
   </div>
 
   <div class="workspace-body" id="workspaceBody">
@@ -52,8 +51,11 @@
       </div>
       <div class="typing-indicator" id="typingIndicator">✨ Claude is thinking...</div>
       <div class="chat-input">
+        <button class="chat-action-btn" id="attachBtn" title="Attach file">📎</button>
+        <button class="chat-action-btn" id="newIdeaBtn" title="Add new idea">➕</button>
         <input class="input" id="chatInput" type="text" placeholder="Describe your idea..." autocomplete="off">
         <button class="btn btn-primary" id="chatSendBtn">Send</button>
+        <input type="file" id="fileInput" style="display:none" multiple>
       </div>
     </div>
 
@@ -62,6 +64,11 @@
 
     <!-- RIGHT: Canvas Panel -->
     <div class="canvas-panel" id="canvasPanel">
+      <div class="canvas-empty" id="canvasEmpty">
+        <div class="canvas-empty-icon">🎨</div>
+        <div class="canvas-empty-text">No visualizations yet</div>
+        <div class="canvas-empty-hint">Chat with Claude to brainstorm — visualizations will appear here</div>
+      </div>
       <div class="canvas-area" id="canvasArea">
         <div class="canvas-grid"></div>
         <div class="canvas-content" id="canvasContent">

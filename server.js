@@ -72,7 +72,7 @@ Your job is to help users develop their ideas, make connections between differen
 }
 
 // --- Chat analysis: Claude responds with structured flow (per-user) ---
-async function handleChatAnalysis(room, socket) {
+async function handleChatAnalysis(room, socket, isNewIdea) {
   const { systemBase, messages } = buildContext(room, socket.id);
   const agentList = getAgentSummaries()
     .map(a => `${a.id}: ${a.icon} ${a.name} — ${a.description}`)
@@ -88,7 +88,23 @@ async function handleChatAnalysis(room, socket) {
   const shouldOfferCanvas = mandatoryDone && (msgsSinceMandatory === 1 || msgsSinceMandatory % 3 === 0);
 
   let phasePrompt;
-  if (isFirstMessage) {
+  if (isNewIdea) {
+    phasePrompt = `The user is introducing a NEW, ADDITIONAL idea to the brainstorm session.
+
+Your job:
+1. **Analyze** this new idea briefly (1-2 sentences).
+2. **Connect** it to the existing brainstorm — find synergies, overlaps, or complementary angles with existing artifacts and the main idea discussed so far.
+3. **Suggest** how this new idea could be integrated (as a new branch, a separate track, a pivot, etc.).
+4. **Offer visualizations** — suggest 2-3 visualization types that would best capture this new idea and its relationship to the existing brainstorm.
+
+Always include "offer_canvas": true and "suggest" in the JSON.
+
+In the JSON block:
+- "phase": "free"
+- "suggest": array of 2-3 agent IDs
+- "offer_canvas": true
+- "questions": optional 0-2 quick clarifying questions about the new idea`;
+  } else if (isFirstMessage) {
     phasePrompt = `This is the user's FIRST message about their idea.
 
 STRICT STRUCTURE for your response:
@@ -583,7 +599,7 @@ io.on('connection', (socket) => {
     socket.userName = userName;
   });
 
-  socket.on('send-message', ({ roomId, content }) => {
+  socket.on('send-message', ({ roomId, content, isNewIdea }) => {
     const room = rooms[roomId];
     if (!room) return;
 
@@ -620,7 +636,7 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('sidebar-message', { message });
 
     // Trigger Claude analysis (per-user)
-    handleChatAnalysis(room, socket);
+    handleChatAnalysis(room, socket, isNewIdea);
   });
 
   socket.on('generate-artifact', ({ roomId, type, referenceIds, customPrompt }) => {

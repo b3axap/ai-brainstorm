@@ -10,7 +10,7 @@ A collaborative brainstorming web app where users describe ideas in a chat with 
 
 **Core concept: "Interpreter Agents"** — each agent is a JSON file in `agents/` that defines a specialized prompt for Claude to generate a specific type of visualization. Adding a new agent = adding a new JSON file + a renderer function + CSS.
 
-**Layout:** Split-view workspace — chat panel (left, resizable ~350px) + canvas panel (right) displayed simultaneously. Mobile (<768px): bottom tab bar switches between panels.
+**Layout:** Split-view workspace — chat panel (left, resizable ~350px) + canvas panel (right) displayed simultaneously. All interaction happens through chat (no header buttons). Chat input has 📎 (attach files) and ➕ (new idea) action icons. Mobile (<768px): bottom tab bar switches between panels.
 
 ## File Structure
 
@@ -71,10 +71,11 @@ public/
 
 1. User creates/joins room → `join-room` → server creates room in memory → workspace split-view appears
 2. User sends message → `send-message` → server calls Claude (streaming) → `claude-chunk` → `claude-done`
-3. Claude may return `canvas_action` in JSON → client shows one-click action button → user confirms → `execute-canvas-action`
-4. User picks visualization from picker modal → `generate-artifact` → server uses agent prompt → Claude generates JSON → `artifact-created` → client renders on canvas
-5. User interacts with artifact → action bar (Expand/Transform/Ask) → `artifact-action` → server calls Claude → `artifact-updated`
-6. User edits inline (mindmap labels, table cells, checklist toggles) → `artifact-data-patch` → server patches data → `artifact-updated` broadcast
+3. User clicks ➕ in chat → enters "new idea" mode → sends message with `isNewIdea: true` → Claude analyzes the new idea, connects it to existing brainstorm, and suggests visualizations
+4. Claude may return `canvas_action` in JSON → client shows one-click action button → user confirms → `execute-canvas-action`
+5. User picks visualization from picker modal (opened via Claude's "Choose more visualizations..." button) → `generate-artifact` → server uses agent prompt → Claude generates JSON → `artifact-created` → client renders on canvas
+6. User interacts with artifact → action bar (Expand/Transform/Ask) → `artifact-action` → server calls Claude → `artifact-updated`
+7. User edits inline (mindmap labels, table cells, checklist toggles) → `artifact-data-patch` → server patches data → `artifact-updated` broadcast
 
 ## Key Patterns
 
@@ -111,6 +112,7 @@ Every Claude call includes full room context via `buildContext(room, socketId)`:
 2. **Mandatory answering**: User answers, Claude continues until all 4 answered
 3. **Mandatory done**: Claude offers canvas visualization (one-time), transitions to free mode
 4. **Free brainstorm**: Open conversation, canvas_action support, suggestions only when contextually obvious
+5. **New idea** (➕ button): User introduces an additional idea — Claude analyzes it, finds connections with existing brainstorm, and suggests visualizations
 
 ### Agent System
 Agents are JSON files auto-loaded from `agents/` directory. Each has: id, name, icon, description, keywords, renderer, systemPrompt, outputExample, externalAPI.
@@ -122,7 +124,7 @@ Agents are JSON files auto-loaded from `agents/` directory. Each has: id, name, 
 
 **Client → Server:**
 - `join-room { roomId?, userName }` — Create or join room
-- `send-message { roomId, content }` — Chat message → triggers Claude
+- `send-message { roomId, content, isNewIdea? }` — Chat message → triggers Claude (isNewIdea flag activates new-idea agent)
 - `generate-artifact { roomId, type, referenceIds?, customPrompt? }` — Generate visualization (optionally referencing other artifacts)
 - `move-artifact { roomId, artifactId, position }` — Drag artifact
 - `artifact-action { roomId, artifactId, action: 'expand'|'transform'|'ask', payload? }` — Artifact manipulation
