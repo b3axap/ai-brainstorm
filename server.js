@@ -699,6 +699,70 @@ io.on('connection', (socket) => {
     });
   });
 
+  // --- Artifact array operations (add/remove/move items) ---
+  socket.on('artifact-array-op', ({ roomId, artifactId, op }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const artifact = room.artifacts.find(a => a.id === artifactId);
+    if (!artifact || !op) return;
+
+    try {
+      const getByPath = (obj, path) => {
+        const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+        for (const p of parts) {
+          if (obj == null) return undefined;
+          obj = obj[p];
+        }
+        return obj;
+      };
+
+      const getParentAndKey = (obj, path) => {
+        const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+        const key = parts.pop();
+        for (const p of parts) {
+          if (obj == null) return { parent: null, key };
+          obj = obj[p];
+        }
+        return { parent: obj, key };
+      };
+
+      if (op.type === 'insert') {
+        // Insert value at end of array at path
+        const arr = getByPath(artifact.data, op.path);
+        if (Array.isArray(arr)) {
+          arr.push(op.value != null ? op.value : '');
+        }
+      } else if (op.type === 'remove') {
+        // Remove item at path (e.g. "branches.2" removes index 2 from branches)
+        const { parent, key } = getParentAndKey(artifact.data, op.path);
+        if (Array.isArray(parent)) {
+          const idx = parseInt(key);
+          if (!isNaN(idx) && idx >= 0 && idx < parent.length) {
+            parent.splice(idx, 1);
+          }
+        }
+      } else if (op.type === 'move') {
+        // Move item from op.path to op.toPath array
+        const { parent: srcParent, key: srcKey } = getParentAndKey(artifact.data, op.path);
+        const destArr = getByPath(artifact.data, op.toPath);
+        if (Array.isArray(srcParent) && Array.isArray(destArr)) {
+          const idx = parseInt(srcKey);
+          if (!isNaN(idx) && idx >= 0 && idx < srcParent.length) {
+            const [item] = srcParent.splice(idx, 1);
+            destArr.push(item);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Array op error:', e.message);
+      return;
+    }
+
+    io.to(roomId).emit('artifact-updated', {
+      roomId, artifactId, data: artifact.data, title: artifact.title
+    });
+  });
+
   // --- Execute canvas action from Claude's suggestion ---
   socket.on('execute-canvas-action', async ({ roomId, canvasAction }) => {
     const room = rooms[roomId];

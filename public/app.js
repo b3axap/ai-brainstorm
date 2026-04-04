@@ -593,9 +593,9 @@ function renderArtifactCard(artifact) {
   // Setup drag
   setupDrag(card, artifact);
 
-  // Setup interactive layer if available
-  if (window.InteractiveLayer) {
-    new InteractiveLayer(card, artifact, socket);
+  // Setup interactive engine
+  if (window.InteractiveEngine) {
+    new InteractiveEngine(card, artifact, socket);
   }
 
   return card;
@@ -999,9 +999,10 @@ socket.on('artifact-updated', ({ artifactId, data, title }) => {
       const titleEl = card.querySelector('.a-title');
       if (titleEl) titleEl.textContent = title;
     }
-    // Re-attach interactive layer
-    if (window.InteractiveLayer) {
-      new InteractiveLayer(card, art, socket);
+    // Re-attach interactive engine (also forwards data to iframes)
+    if (window.InteractiveEngine) {
+      const engine = new InteractiveEngine(card, art, socket);
+      engine.forwardUpdate(data);
     }
   }
 

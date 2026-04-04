@@ -10,12 +10,12 @@
 
 <!-- SCREEN 1: LANDING -->
 <div id="landing" class="screen active">
-  <div class="landing-card">
+  <div class="landing-card" role="form" aria-label="Join or create a brainstorming room">
     <h1>🧠 <span>Brainstorm</span></h1>
     <p class="subtitle">Collaborative AI-powered idea visualization</p>
 
     <div class="input-group">
-      <label>Your name</label>
+      <label for="nameInput">Your name</label>
       <input class="input" id="nameInput" type="text" placeholder="Enter your name..." maxlength="20" autofocus>
     </div>
 
@@ -24,69 +24,69 @@
     <div class="divider">or join existing</div>
 
     <div class="join-row">
-      <input class="input" id="codeInput" type="text" placeholder="ROOM CODE" maxlength="6">
+      <input class="input" id="codeInput" type="text" placeholder="ROOM CODE" maxlength="6" aria-label="Room code">
       <button class="btn" id="joinBtn">Join</button>
     </div>
 
-    <div class="error-msg" id="landingError"></div>
+    <div class="error-msg" id="landingError" role="alert"></div>
   </div>
 </div>
 
 <!-- SCREEN 2: WORKSPACE (chat + canvas split-view) -->
 <div id="workspace" class="screen">
-  <div class="workspace-header">
-    <span class="room-code" id="roomCode" title="Click to copy">---</span>
-    <span class="users-list" id="usersList"></span>
+  <header class="workspace-header">
+    <button class="room-code" id="roomCode" title="Click to copy room code" aria-label="Copy room code">---</button>
+    <span class="users-list" id="usersList" aria-label="Active users"></span>
     <span class="spacer"></span>
-  </div>
+  </header>
 
-  <div class="workspace-body" id="workspaceBody">
+  <main class="workspace-body" id="workspaceBody">
     <!-- LEFT: Chat Panel -->
-    <div class="chat-panel" id="chatPanel">
-      <div class="chat-messages" id="chatMessages">
+    <aside class="chat-panel" id="chatPanel" aria-label="Chat">
+      <div class="chat-messages" id="chatMessages" role="log" aria-label="Chat messages" aria-live="polite">
         <div class="message assistant">
           <div class="msg-header"><span class="name">Claude</span></div>
           <div class="msg-bubble">Welcome! Describe your idea and I'll help you brainstorm and visualize it. 🧠</div>
         </div>
       </div>
-      <div class="typing-indicator" id="typingIndicator">✨ Claude is thinking...</div>
+      <div class="typing-indicator" id="typingIndicator" aria-live="polite">✨ Claude is thinking...</div>
       <div class="chat-input">
-        <button class="chat-action-btn" id="attachBtn" title="Attach file">📎</button>
-        <button class="chat-action-btn" id="newIdeaBtn" title="Add new idea">➕</button>
-        <input class="input" id="chatInput" type="text" placeholder="Describe your idea..." autocomplete="off">
+        <button class="chat-action-btn" id="attachBtn" title="Attach file" aria-label="Attach file">📎</button>
+        <button class="chat-action-btn" id="newIdeaBtn" title="Start new idea" aria-label="Start new idea">➕</button>
+        <input class="input" id="chatInput" type="text" placeholder="Describe your idea..." autocomplete="off" aria-label="Chat message">
         <button class="btn btn-primary" id="chatSendBtn">Send</button>
-        <input type="file" id="fileInput" style="display:none" multiple>
+        <input type="file" id="fileInput" style="display:none" multiple aria-hidden="true">
       </div>
-    </div>
+    </aside>
 
     <!-- RESIZE HANDLE -->
-    <div class="resize-handle" id="resizeHandle"></div>
+    <div class="resize-handle" id="resizeHandle" role="separator" aria-orientation="vertical" aria-label="Resize chat and canvas panels" tabindex="0"></div>
 
     <!-- RIGHT: Canvas Panel -->
-    <div class="canvas-panel" id="canvasPanel">
-      <div class="canvas-empty" id="canvasEmpty">
+    <section class="canvas-panel" id="canvasPanel" aria-label="Canvas">
+      <div class="canvas-empty" id="canvasEmpty" aria-hidden="true">
         <div class="canvas-empty-icon">🎨</div>
         <div class="canvas-empty-text">No visualizations yet</div>
         <div class="canvas-empty-hint">Chat with Claude to brainstorm — visualizations will appear here</div>
       </div>
       <div class="canvas-area" id="canvasArea">
-        <div class="canvas-grid"></div>
-        <div class="canvas-content" id="canvasContent">
+        <div class="canvas-grid" aria-hidden="true"></div>
+        <div class="canvas-content" id="canvasContent" role="region" aria-label="Artifacts">
           <!-- Artifact cards rendered here -->
         </div>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
   <!-- Mobile bottom tabs -->
-  <div class="mobile-tabs" id="mobileTabs">
-    <button class="mobile-tab active" id="mobileTabChat">💬 Chat</button>
-    <button class="mobile-tab" id="mobileTabCanvas">🎨 Canvas</button>
-  </div>
+  <nav class="mobile-tabs" id="mobileTabs" aria-label="View switcher">
+    <button class="mobile-tab active" id="mobileTabChat" aria-pressed="true">💬 Chat</button>
+    <button class="mobile-tab" id="mobileTabCanvas" aria-pressed="false">🎨 Canvas</button>
+  </nav>
 </div>
 
 <!-- VISUALIZATION PICKER MODAL -->
-<div class="modal-overlay" id="vizPickerModal">
+<div class="modal-overlay" id="vizPickerModal" role="dialog" aria-modal="true" aria-label="Choose visualizations">
   <div class="modal modal-wide">
     <h2>🎨 Choose Visualizations</h2>
     <p class="modal-subtitle">Select one or more. Claude's suggestions are pre-selected.</p>
@@ -117,7 +117,7 @@
 </div>
 
 <!-- TOAST -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- Mention autocomplete dropdown -->
 <div class="mention-dropdown" id="mentionDropdown"></div>

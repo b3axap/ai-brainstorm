@@ -1,5 +1,6 @@
 // renderers.js — Registry of artifact renderers
 // Each renderer: (data, container) => void
+// All renderers annotate elements with data-attributes for InteractiveEngine
 
 const renderers = {
   mindmap: renderMindMap,
@@ -41,7 +42,7 @@ function renderMindMap(data, container) {
   let svg = `<svg class="mindmap-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
 
   const branches = data.branches || [];
-  const angleStep = (2 * Math.PI) / branches.length;
+  const angleStep = (2 * Math.PI) / Math.max(branches.length, 1);
   const branchRadius = Math.min(W, H) * 0.32;
 
   branches.forEach((branch, i) => {
@@ -49,14 +50,16 @@ function renderMindMap(data, container) {
     const bx = cx + Math.cos(angle) * branchRadius;
     const by = cy + Math.sin(angle) * branchRadius;
 
-    // Line from center to branch
     svg += `<line class="edge" x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}"/>`;
 
-    // Branch node
     const bLabel = (branch.label || '').substring(0, 25);
     const bw = Math.max(80, bLabel.length * 7 + 20);
+
+    // Branch node group with delete
+    svg += `<g data-delete="branches.${i}" class="bs-node-group">`;
     svg += `<rect class="node-branch" x="${bx - bw/2}" y="${by - 14}" width="${bw}" height="28" rx="14"/>`;
-    svg += `<text x="${bx}" y="${by + 4}" text-anchor="middle" font-size="11">${escapeHtml(bLabel)}</text>`;
+    svg += `<text data-edit="branches.${i}.label" x="${bx}" y="${by + 4}" text-anchor="middle" font-size="11">${escapeHtml(bLabel)}</text>`;
+    svg += `</g>`;
 
     // Children
     const children = branch.children || [];
@@ -68,21 +71,40 @@ function renderMindMap(data, container) {
       const chy = by + Math.sin(childAngle) * childRadius;
 
       svg += `<line class="edge" x1="${bx}" y1="${by}" x2="${chx}" y2="${chy}" opacity="0.5"/>`;
-      const cLabel = (typeof child === 'string' ? child : child.label || '').substring(0, 20);
+
+      const isString = typeof child === 'string';
+      const cLabel = (isString ? child : child.label || '').substring(0, 20);
       const cw = Math.max(60, cLabel.length * 6.5 + 16);
+      const editPath = isString ? `branches.${i}.children.${j}` : `branches.${i}.children.${j}.label`;
+
+      svg += `<g data-delete="branches.${i}.children.${j}" class="bs-node-group">`;
       svg += `<rect class="node-child" x="${chx - cw/2}" y="${chy - 10}" width="${cw}" height="20" rx="10"/>`;
-      svg += `<text x="${chx}" y="${chy + 3}" text-anchor="middle" font-size="9.5">${escapeHtml(cLabel)}</text>`;
+      svg += `<text data-edit="${editPath}" x="${chx}" y="${chy + 3}" text-anchor="middle" font-size="9.5">${escapeHtml(cLabel)}</text>`;
+      svg += `</g>`;
     });
+
+    // Add child button (small "+" near last child position)
+    const addAngle = angle + ((children.length) - (children.length - 1) / 2) * (childAngleSpread / Math.max(1, children.length));
+    const addX = bx + Math.cos(addAngle) * childRadius;
+    const addY = by + Math.sin(addAngle) * childRadius;
+    svg += `<g data-add="branches.${i}.children" data-add-template='"New"' class="bs-svg-add" style="cursor:pointer;">`;
+    svg += `<circle cx="${addX}" cy="${addY}" r="8" fill="var(--surface2)" stroke="var(--accent)" stroke-width="1" opacity="0.5"/>`;
+    svg += `<text x="${addX}" y="${addY + 3.5}" text-anchor="middle" font-size="10" fill="var(--accent)" opacity="0.5">+</text>`;
+    svg += `</g>`;
   });
 
-  // Center node (drawn last, on top)
+  // Center node
   const centerLabel = (data.center || '').substring(0, 30);
   const centerW = Math.max(100, centerLabel.length * 8 + 24);
   svg += `<rect class="node-center" x="${cx - centerW/2}" y="${cy - 16}" width="${centerW}" height="32" rx="16"/>`;
-  svg += `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="13" font-weight="600" fill="white">${escapeHtml(centerLabel)}</text>`;
+  svg += `<text data-edit="center" x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="13" font-weight="600" fill="white">${escapeHtml(centerLabel)}</text>`;
 
   svg += '</svg>';
-  container.innerHTML = svg;
+
+  // Add branch button (outside SVG)
+  const addBranchHTML = `<div data-add="branches" data-add-template='${escapeHtml(JSON.stringify({label:"New Branch",children:[]}))}' class="bs-add-zone" title="Add branch">+ Add branch</div>`;
+
+  container.innerHTML = svg + addBranchHTML;
 }
 
 // --- TABLE ---
@@ -93,25 +115,30 @@ function renderTable(data, container) {
   }
 
   let html = '<table class="render-table"><thead><tr>';
-  data.columns.forEach(col => {
-    html += `<th>${escapeHtml(col)}</th>`;
+  data.columns.forEach((col, ci) => {
+    html += `<th data-edit="columns.${ci}">${escapeHtml(col)}</th>`;
   });
   html += '</tr></thead><tbody>';
 
-  data.rows.forEach(row => {
-    html += '<tr>';
-    row.forEach(cell => {
+  data.rows.forEach((row, ri) => {
+    html += `<tr data-delete="rows.${ri}">`;
+    row.forEach((cell, ci) => {
       if (typeof cell === 'object' && cell !== null && cell.text) {
         const tagClass = cell.tag ? `tag-${cell.tag}` : '';
-        html += `<td><span class="tag ${tagClass}">${escapeHtml(cell.text)}</span></td>`;
+        html += `<td data-edit="rows.${ri}.${ci}.text"><span class="tag ${tagClass}">${escapeHtml(cell.text)}</span></td>`;
       } else {
-        html += `<td>${escapeHtml(String(cell || ''))}</td>`;
+        html += `<td data-edit="rows.${ri}.${ci}">${escapeHtml(String(cell || ''))}</td>`;
       }
     });
     html += '</tr>';
   });
 
   html += '</tbody></table>';
+
+  // Add row button
+  const emptyRow = JSON.stringify(data.columns.map(() => ''));
+  html += `<div data-add="rows" data-add-template='${escapeHtml(emptyRow)}' class="bs-add-zone" title="Add row">+ Add row</div>`;
+
   container.innerHTML = html;
 }
 
@@ -134,14 +161,16 @@ function renderPresentation(data, container) {
     container.innerHTML = `
       <div class="slides-container">
         <div class="slide-view">
-          <h3>${escapeHtml(slide.title || '')}</h3>
-          <ul>${(slide.bullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
+          <h3 data-edit="slides.${current}.title">${escapeHtml(slide.title || '')}</h3>
+          <ul>${(slide.bullets || []).map((b, bi) => `<li data-edit="slides.${current}.bullets.${bi}" data-delete="slides.${current}.bullets.${bi}">${escapeHtml(b)}</li>`).join('')}</ul>
+          <div data-add="slides.${current}.bullets" data-add-template='""' class="bs-add-zone bs-add-zone-sm">+ Add bullet</div>
         </div>
         <div class="slide-nav">
           <button class="slide-prev">\u2039</button>
           ${dots}
           <button class="slide-next">\u203a</button>
           <span class="slide-counter">${current + 1} / ${slides.length}</span>
+          <button class="bs-add-slide-btn" title="Add slide">+</button>
         </div>
       </div>
     `;
@@ -161,6 +190,17 @@ function renderPresentation(data, container) {
         renderSlide();
       };
     });
+
+    // Add slide button
+    const addSlideBtn = container.querySelector('.bs-add-slide-btn');
+    if (addSlideBtn) {
+      addSlideBtn.onclick = (e) => {
+        e.stopPropagation();
+        // We need the engine to emit this, but we're in renderer context
+        // Store a custom event for the engine to pick up
+        container.dispatchEvent(new CustomEvent('bs-add-slide', { bubbles: true }));
+      };
+    }
   }
 
   renderSlide();
@@ -174,24 +214,25 @@ function renderDiagram(data, container) {
   }
 
   const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
-  container.innerHTML = `<div class="diagram-container" id="${id}">${escapeHtml(data.mermaid)}</div>`;
+  container.innerHTML = `
+    <div class="diagram-container" id="${id}">${escapeHtml(data.mermaid)}</div>
+    <button class="bs-edit-code-btn" data-edit-multiline="mermaid" title="Edit diagram source">Edit Code</button>
+  `;
 
-  // Render with mermaid.js if available
   if (window.mermaid) {
     try {
       window.mermaid.render(id + '-svg', data.mermaid).then(({ svg }) => {
-        // Guard: check container is still in the DOM before updating
         const target = container.querySelector('.diagram-container');
         if (target && document.contains(container)) {
           target.innerHTML = svg;
         }
       }).catch(() => {
         if (document.contains(container)) {
-          container.innerHTML = `<pre style="font-size:11px;color:var(--text2);padding:10px;white-space:pre-wrap;">${escapeHtml(data.mermaid)}</pre>`;
+          container.querySelector('.diagram-container').innerHTML = `<pre style="font-size:11px;color:var(--text2);padding:10px;white-space:pre-wrap;">${escapeHtml(data.mermaid)}</pre>`;
         }
       });
     } catch {
-      container.innerHTML = `<pre style="font-size:11px;color:var(--text2);padding:10px;white-space:pre-wrap;">${escapeHtml(data.mermaid)}</pre>`;
+      container.querySelector('.diagram-container').innerHTML = `<pre style="font-size:11px;color:var(--text2);padding:10px;white-space:pre-wrap;">${escapeHtml(data.mermaid)}</pre>`;
     }
   }
 }
@@ -204,8 +245,7 @@ function renderHTMLGuide(data, container) {
   iframe.sandbox = 'allow-scripts';
   container.innerHTML = '';
   container.appendChild(iframe);
-  iframe.srcdoc = html;
-  // Auto-resize
+  iframe.srcdoc = BRAINSTORM_SDK_SCRIPT + html;
   iframe.onload = () => {
     try {
       iframe.style.height = iframe.contentDocument.body.scrollHeight + 20 + 'px';
@@ -222,8 +262,8 @@ function renderImage(data, container) {
       <div class="image-placeholder">
         <div style="font-size:32px;margin-bottom:8px;">\ud83c\udfa8</div>
         <div style="font-size:13px;margin-bottom:4px;">Image generation coming soon</div>
-        <div style="font-size:11px;opacity:.7;">Prompt: "${escapeHtml((data.prompt || '').substring(0, 100))}"</div>
-        <div style="font-size:10px;margin-top:4px;">Style: ${escapeHtml(data.style || 'auto')}</div>
+        <div data-edit="prompt" style="font-size:11px;opacity:.7;">Prompt: "${escapeHtml((data.prompt || '').substring(0, 100))}"</div>
+        <div data-edit="style" style="font-size:10px;margin-top:4px;">Style: ${escapeHtml(data.style || 'auto')}</div>
       </div>`;
   }
 }
@@ -242,7 +282,6 @@ function renderFreeform(data, container) {
   iframe.className = 'freeform-iframe';
   iframe.sandbox = 'allow-scripts';
 
-  // Error boundary: show fallback if iframe fails to render content
   const errorTimeout = setTimeout(() => {
     try {
       if (document.contains(wrapper) && (!iframe.contentDocument || !iframe.contentDocument.body || iframe.contentDocument.body.innerHTML.length < 10)) {
@@ -262,7 +301,8 @@ function renderFreeform(data, container) {
   wrapper.appendChild(iframe);
   container.innerHTML = '';
   container.appendChild(wrapper);
-  iframe.srcdoc = data.html;
+  // Inject SDK into freeform HTML
+  iframe.srcdoc = BRAINSTORM_SDK_SCRIPT + data.html;
 }
 
 // --- TIMELINE ---
@@ -275,7 +315,7 @@ function renderTimeline(data, container) {
   const statusColors = { done: 'var(--green)', current: 'var(--accent)', upcoming: 'var(--text2)' };
 
   let html = '<div class="timeline-container">';
-  if (data.title) html += `<div class="timeline-title">${escapeHtml(data.title)}</div>`;
+  if (data.title) html += `<div class="timeline-title" data-edit="title">${escapeHtml(data.title)}</div>`;
   html += '<div class="timeline-track">';
 
   ms.forEach((m, i) => {
@@ -283,18 +323,20 @@ function renderTimeline(data, container) {
     const filled = m.status === 'done' || m.status === 'current';
     const isCurrent = m.status === 'current';
     html += `
-      <div class="tl-item ${m.status}">
-        <div class="tl-dot" style="border-color:${color};${filled ? `background:${color}` : ''}${isCurrent ? ';box-shadow:0 0 8px ' + color : ''}"></div>
+      <div class="tl-item ${m.status}" data-delete="milestones.${i}">
+        <div class="tl-dot" data-cycle="milestones.${i}.status" data-cycle-values='["upcoming","current","done"]' style="border-color:${color};${filled ? `background:${color}` : ''}${isCurrent ? ';box-shadow:0 0 8px ' + color : ''}" title="Click to change status"></div>
         ${i < ms.length - 1 ? `<div class="tl-line" style="background:${m.status === 'done' ? 'var(--green)' : 'var(--border)'}"></div>` : ''}
         <div class="tl-content">
-          <div class="tl-label" style="color:${color}">${escapeHtml(m.label || '')}</div>
-          <div class="tl-date">${escapeHtml(m.date || '')}</div>
-          <div class="tl-desc">${escapeHtml(m.description || '')}</div>
+          <div class="tl-label" data-edit="milestones.${i}.label" style="color:${color}">${escapeHtml(m.label || '')}</div>
+          <div class="tl-date" data-edit="milestones.${i}.date">${escapeHtml(m.date || '')}</div>
+          <div class="tl-desc" data-edit="milestones.${i}.description">${escapeHtml(m.description || '')}</div>
         </div>
       </div>`;
   });
 
-  html += '</div></div>';
+  html += '</div>';
+  html += `<div data-add="milestones" data-add-template='${escapeHtml(JSON.stringify({label:"New milestone",date:"",description:"",status:"upcoming"}))}' class="bs-add-zone">+ Add milestone</div>`;
+  html += '</div>';
   container.innerHTML = html;
 }
 
@@ -306,10 +348,10 @@ function renderSWOT(data, container) {
   }
 
   const quads = [
-    { key: 'strengths', label: 'Strengths', color: 'var(--green)', icon: '💪' },
-    { key: 'weaknesses', label: 'Weaknesses', color: 'var(--red)', icon: '⚠️' },
-    { key: 'opportunities', label: 'Opportunities', color: 'var(--blue)', icon: '🚀' },
-    { key: 'threats', label: 'Threats', color: 'var(--orange)', icon: '🔥' }
+    { key: 'strengths', label: 'Strengths', color: 'var(--green)', icon: '\ud83d\udcaa' },
+    { key: 'weaknesses', label: 'Weaknesses', color: 'var(--red)', icon: '\u26a0\ufe0f' },
+    { key: 'opportunities', label: 'Opportunities', color: 'var(--blue)', icon: '\ud83d\ude80' },
+    { key: 'threats', label: 'Threats', color: 'var(--orange)', icon: '\ud83d\udd25' }
   ];
 
   let html = '<div class="swot-grid">';
@@ -317,7 +359,10 @@ function renderSWOT(data, container) {
     const items = data[q.key] || [];
     html += `<div class="swot-quad" style="border-color:${q.color}20">
       <div class="swot-header" style="color:${q.color}">${q.icon} ${q.label}</div>
-      <ul class="swot-list">${items.map(it => `<li><span class="swot-bullet" style="background:${q.color}"></span>${escapeHtml(it)}</li>`).join('')}</ul>
+      <ul class="swot-list">${items.map((it, j) =>
+        `<li data-edit="${q.key}.${j}" data-delete="${q.key}.${j}"><span class="swot-bullet" style="background:${q.color}"></span>${escapeHtml(it)}</li>`
+      ).join('')}</ul>
+      <div data-add="${q.key}" data-add-template='"New item"' class="bs-add-zone bs-add-zone-sm">+ Add</div>
     </div>`;
   });
   html += '</div>';
@@ -335,22 +380,24 @@ function renderKanban(data, container) {
   const tagColors = { feature: 'var(--accent)', bug: 'var(--red)', research: 'var(--blue)', design: 'var(--pink)', infra: 'var(--orange)', docs: 'var(--green)' };
 
   let html = '<div class="kanban-board">';
-  data.columns.forEach(col => {
+  data.columns.forEach((col, ci) => {
     const color = colColors[col.name] || 'var(--accent)';
     html += `<div class="kanban-col">
-      <div class="kanban-col-header" style="border-bottom-color:${color}">
+      <div class="kanban-col-header" data-edit="columns.${ci}.name" style="border-bottom-color:${color}">
         <span style="color:${color}">${escapeHtml(col.name)}</span>
         <span class="kanban-count" style="background:${color}20;color:${color}">${(col.cards || []).length}</span>
       </div>
-      <div class="kanban-cards">`;
-    (col.cards || []).forEach(card => {
+      <div class="kanban-cards" data-drag-target="columns.${ci}.cards">`;
+    (col.cards || []).forEach((card, cardi) => {
       const tc = tagColors[card.tag] || 'var(--text2)';
-      html += `<div class="kanban-card">
-        <div class="kanban-card-title">${escapeHtml(card.title)}</div>
+      html += `<div class="kanban-card" data-drag-item="columns.${ci}.cards.${cardi}" data-delete="columns.${ci}.cards.${cardi}">
+        <div class="kanban-card-title" data-edit="columns.${ci}.cards.${cardi}.title">${escapeHtml(card.title)}</div>
         ${card.tag ? `<span class="kanban-tag" style="background:${tc}20;color:${tc}">${escapeHtml(card.tag)}</span>` : ''}
       </div>`;
     });
-    html += '</div></div>';
+    html += `</div>
+      <div data-add="columns.${ci}.cards" data-add-template='${escapeHtml(JSON.stringify({title:"New card",tag:""}))}' class="bs-add-zone bs-add-zone-sm">+ Add card</div>
+    </div>`;
   });
   html += '</div>';
   container.innerHTML = html;
@@ -364,19 +411,21 @@ function renderProsCons(data, container) {
   }
 
   let html = '<div class="proscons-container">';
-  if (data.title) html += `<div class="proscons-title">${escapeHtml(data.title)}</div>`;
+  if (data.title) html += `<div class="proscons-title" data-edit="title">${escapeHtml(data.title)}</div>`;
   html += '<div class="proscons-grid">';
 
-  html += '<div class="proscons-col pros"><div class="proscons-header" style="color:var(--green)">✓ Pros</div>';
-  data.pros.forEach(p => { html += `<div class="proscons-item"><span class="pc-icon" style="color:var(--green)">+</span>${escapeHtml(p)}</div>`; });
+  html += '<div class="proscons-col pros"><div class="proscons-header" style="color:var(--green)">\u2713 Pros</div>';
+  data.pros.forEach((p, i) => { html += `<div class="proscons-item" data-edit="pros.${i}" data-delete="pros.${i}"><span class="pc-icon" style="color:var(--green)">+</span>${escapeHtml(p)}</div>`; });
+  html += `<div data-add="pros" data-add-template='"New pro"' class="bs-add-zone bs-add-zone-sm">+ Add pro</div>`;
   html += '</div>';
 
-  html += '<div class="proscons-col cons"><div class="proscons-header" style="color:var(--red)">✗ Cons</div>';
-  data.cons.forEach(c => { html += `<div class="proscons-item"><span class="pc-icon" style="color:var(--red)">−</span>${escapeHtml(c)}</div>`; });
+  html += '<div class="proscons-col cons"><div class="proscons-header" style="color:var(--red)">\u2717 Cons</div>';
+  data.cons.forEach((c, i) => { html += `<div class="proscons-item" data-edit="cons.${i}" data-delete="cons.${i}"><span class="pc-icon" style="color:var(--red)">\u2212</span>${escapeHtml(c)}</div>`; });
+  html += `<div data-add="cons" data-add-template='"New con"' class="bs-add-zone bs-add-zone-sm">+ Add con</div>`;
   html += '</div>';
 
   html += '</div>';
-  if (data.verdict) html += `<div class="proscons-verdict">${escapeHtml(data.verdict)}</div>`;
+  if (data.verdict) html += `<div class="proscons-verdict" data-edit="verdict">${escapeHtml(data.verdict)}</div>`;
   html += '</div>';
   container.innerHTML = html;
 }
@@ -392,20 +441,21 @@ function renderMatrix(data, container) {
   const positions = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 
   let html = '<div class="matrix-container">';
-  html += `<div class="matrix-axis-y"><span>↑ ${escapeHtml(data.axisY || 'Impact')}</span></div>`;
+  html += `<div class="matrix-axis-y"><span data-edit="axisY">\u2191 ${escapeHtml(data.axisY || 'Impact')}</span></div>`;
   html += '<div class="matrix-grid">';
 
   data.quadrants.forEach((q, i) => {
-    html += `<div class="matrix-quad ${positions[i]}" style="border-color:${colors[i]}30">
-      <div class="matrix-quad-label" style="color:${colors[i]}">${escapeHtml(q.label)}</div>
-      <div class="matrix-items">${(q.items || []).map(it =>
-        `<span class="matrix-chip" style="background:${colors[i]}15;border-color:${colors[i]}40;color:${colors[i]}">${escapeHtml(it)}</span>`
+    html += `<div class="matrix-quad ${positions[i]}" style="border-color:${colors[i]}30" data-drag-target="quadrants.${i}.items">
+      <div class="matrix-quad-label" data-edit="quadrants.${i}.label" style="color:${colors[i]}">${escapeHtml(q.label)}</div>
+      <div class="matrix-items">${(q.items || []).map((it, j) =>
+        `<span class="matrix-chip" data-edit="quadrants.${i}.items.${j}" data-delete="quadrants.${i}.items.${j}" data-drag-item="quadrants.${i}.items.${j}" style="background:${colors[i]}15;border-color:${colors[i]}40;color:${colors[i]}">${escapeHtml(it)}</span>`
       ).join('')}</div>
+      <div data-add="quadrants.${i}.items" data-add-template='"New item"' class="bs-add-zone bs-add-zone-sm">+ Add</div>
     </div>`;
   });
 
   html += '</div>';
-  html += `<div class="matrix-axis-x">${escapeHtml(data.axisX || 'Effort')} →</div>`;
+  html += `<div class="matrix-axis-x" data-edit="axisX">${escapeHtml(data.axisX || 'Effort')} \u2192</div>`;
   html += '</div>';
   container.innerHTML = html;
 }
@@ -419,22 +469,23 @@ function renderChecklist(data, container) {
 
   const doneCount = data.items.filter(i => i.done).length;
   const total = data.items.length;
-  const pct = Math.round((doneCount / total) * 100);
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
   let html = '<div class="checklist-container">';
-  if (data.title) html += `<div class="checklist-title">${escapeHtml(data.title)}</div>`;
+  if (data.title) html += `<div class="checklist-title" data-edit="title">${escapeHtml(data.title)}</div>`;
   html += `<div class="checklist-progress">
     <div class="checklist-bar"><div class="checklist-bar-fill" style="width:${pct}%"></div></div>
     <span class="checklist-count">${doneCount} / ${total}</span>
   </div>`;
 
-  data.items.forEach(item => {
-    html += `<div class="checklist-item ${item.done ? 'done' : ''}">
-      <div class="checklist-check">${item.done ? '✓' : ''}</div>
-      <span class="checklist-text">${escapeHtml(item.text)}</span>
+  data.items.forEach((item, i) => {
+    html += `<div class="checklist-item ${item.done ? 'done' : ''}" data-delete="items.${i}">
+      <div class="checklist-check" data-toggle="items.${i}.done">${item.done ? '\u2713' : ''}</div>
+      <span class="checklist-text" data-edit="items.${i}.text">${escapeHtml(item.text)}</span>
     </div>`;
   });
 
+  html += `<div data-add="items" data-add-template='${escapeHtml(JSON.stringify({text:"New item",done:false}))}' class="bs-add-zone bs-add-zone-sm">+ Add item</div>`;
   html += '</div>';
   container.innerHTML = html;
 }
@@ -468,22 +519,23 @@ function renderDonutChart(data, container) {
     offset += dashLen;
   });
 
-  let legend = data.segments.map(seg => {
+  let legend = data.segments.map((seg, i) => {
     const color = colorMap[seg.color] || seg.color || '#6c5ce7';
     const pct = Math.round((seg.value / total) * 100);
-    return `<div class="donut-legend-item">
+    return `<div class="donut-legend-item" data-delete="segments.${i}">
       <span class="donut-legend-dot" style="background:${color}"></span>
-      <span class="donut-legend-label">${escapeHtml(seg.label)}</span>
-      <span class="donut-legend-value" style="color:${color}">${pct}%</span>
+      <span class="donut-legend-label" data-edit="segments.${i}.label">${escapeHtml(seg.label)}</span>
+      <span class="donut-legend-value" data-edit="segments.${i}.value" style="color:${color}">${pct}%</span>
     </div>`;
   }).join('');
 
   container.innerHTML = `<div class="donut-container">
     <div class="donut-chart">
       <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${arcs}</svg>
-      <div class="donut-center">${escapeHtml(data.centerLabel || '')}</div>
+      <div class="donut-center" data-edit="centerLabel">${escapeHtml(data.centerLabel || '')}</div>
     </div>
     <div class="donut-legend">${legend}</div>
+    <div data-add="segments" data-add-template='${escapeHtml(JSON.stringify({label:"New",value:10,color:"purple"}))}' class="bs-add-zone bs-add-zone-sm">+ Add segment</div>
   </div>`;
 }
 
@@ -495,13 +547,63 @@ function renderQuoteCard(data, container) {
   }
 
   container.innerHTML = `<div class="quote-container">
-    ${data.tag ? `<span class="quote-tag">${escapeHtml(data.tag)}</span>` : ''}
+    ${data.tag ? `<span class="quote-tag" data-cycle="tag" data-cycle-values='["Key Insight","Decision","Action Item","Vision","Problem","Opportunity"]'>${escapeHtml(data.tag)}</span>` : ''}
     <div class="quote-mark">"</div>
-    <div class="quote-text">${escapeHtml(data.quote)}</div>
-    ${data.author ? `<div class="quote-author">— ${escapeHtml(data.author)}</div>` : ''}
-    ${data.supporting ? `<div class="quote-supporting">${escapeHtml(data.supporting)}</div>` : ''}
+    <div class="quote-text" data-edit-multiline="quote">${escapeHtml(data.quote)}</div>
+    ${data.author ? `<div class="quote-author" data-edit="author">\u2014 ${escapeHtml(data.author)}</div>` : ''}
+    ${data.supporting ? `<div class="quote-supporting" data-edit="supporting">${escapeHtml(data.supporting)}</div>` : ''}
   </div>`;
 }
+
+// --- Brainstorm SDK for iframes (freeform / html_guide) ---
+const BRAINSTORM_SDK_SCRIPT = `<script>
+(function() {
+  window.brainstorm = {
+    _callbacks: [],
+    edit: function(path, value) {
+      parent.postMessage({ type: 'bs-patch', path: path, value: value }, '*');
+    },
+    add: function(arrayPath, item) {
+      parent.postMessage({ type: 'bs-array-op', op: { type: 'insert', path: arrayPath, value: item } }, '*');
+    },
+    delete: function(arrayPath, index) {
+      parent.postMessage({ type: 'bs-array-op', op: { type: 'remove', path: arrayPath + '.' + index } }, '*');
+    },
+    getData: function() {
+      return new Promise(function(resolve) {
+        var handler = function(e) {
+          if (e.data && e.data.type === 'bs-data-response') {
+            window.removeEventListener('message', handler);
+            resolve(e.data.data);
+          }
+        };
+        window.addEventListener('message', handler);
+        parent.postMessage({ type: 'bs-get-data' }, '*');
+      });
+    },
+    onUpdate: function(callback) {
+      brainstorm._callbacks.push(callback);
+    },
+    markEditable: function(el, path) {
+      if (!el) return;
+      el.contentEditable = true;
+      el.style.cursor = 'text';
+      el.style.outline = 'none';
+      el.addEventListener('blur', function() {
+        brainstorm.edit(path, el.textContent.trim());
+      });
+      el.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
+      });
+    }
+  };
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'bs-data-update') {
+      brainstorm._callbacks.forEach(function(cb) { cb(e.data.data); });
+    }
+  });
+})();
+<\/script>`;
 
 // --- Utility ---
 function escapeHtml(str) {

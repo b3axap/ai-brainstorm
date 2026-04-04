@@ -6,7 +6,7 @@
   --surface3: #2a2f3d;
   --border: #2e3345;
   --text: #e4e7f0;
-  --text2: #8b90a0;
+  --text2: #9ea3b5;
   --accent: #6c5ce7;
   --accent2: #a29bfe;
   --green: #00cec9;
@@ -18,6 +18,11 @@
   --shadow: 0 4px 24px rgba(0,0,0,.4);
 }
 body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+/* Accessibility: focus indicators */
+:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.btn:focus-visible, .suggest-btn:focus-visible, .clarify-option-btn:focus-visible, .chat-action-btn:focus-visible, .mobile-tab:focus-visible, .viz-card:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,92,231,.3); }
 
 /* SCREENS */
 .screen { display: none; height: 100vh; }
@@ -31,7 +36,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .landing-card .subtitle { color: var(--text2); font-size: 14px; margin-bottom: 28px; }
 .input { width: 100%; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; transition: border-color .15s; }
 .input:focus { border-color: var(--accent); }
-.input::placeholder { color: var(--text2); opacity: .5; }
+.input::placeholder { color: #6a7086; }
 .input-group { margin-bottom: 12px; text-align: left; }
 .input-group label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .8px; display: block; margin-bottom: 6px; }
 .btn { padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 13px; cursor: pointer; font-family: inherit; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; justify-content: center; }
@@ -48,7 +53,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 /* --- WORKSPACE (split-view) --- */
 #workspace { flex-direction: column; }
 .workspace-header { height: 48px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0; }
-.workspace-header .room-code { font-size: 12px; color: var(--text2); background: var(--surface2); padding: 4px 10px; border-radius: 6px; font-family: monospace; letter-spacing: 1px; cursor: pointer; }
+.workspace-header .room-code { font-size: 12px; color: var(--text2); background: var(--surface2); padding: 4px 10px; border-radius: 6px; font-family: monospace; letter-spacing: 1px; cursor: pointer; border: 1px solid transparent; }
 .workspace-header .room-code:hover { color: var(--accent2); }
 .workspace-header .users-list { font-size: 12px; color: var(--text2); }
 .spacer { flex: 1; }
@@ -63,7 +68,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .canvas-empty { position: sticky; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--text2); pointer-events: none; z-index: 2; }
 .canvas-empty-icon { font-size: 48px; margin-bottom: 12px; opacity: .4; }
 .canvas-empty-text { font-size: 14px; margin-bottom: 4px; }
-.canvas-empty-hint { font-size: 12px; opacity: .6; }
+.canvas-empty-hint { font-size: 12px; opacity: .75; }
 
 /* Mobile tabs */
 .mobile-tabs { display: none; height: 48px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
@@ -78,6 +83,10 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   .workspace-body.show-canvas .chat-panel { transform: translateX(-100%); }
   .workspace-body.show-canvas .canvas-panel { z-index: 10; }
   .mobile-tabs { display: flex; }
+  /* A11y: mobile touch targets >= 44px */
+  .clarify-option-btn { min-height: 44px; display: inline-flex; align-items: center; }
+  .suggest-btn { min-height: 44px; }
+  .chat-action-btn { min-width: 44px; min-height: 44px; }
 }
 
 /* --- CHAT PANEL CONTENTS --- */
@@ -376,15 +385,67 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .canvas-action-btn { margin-top: 8px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--green); background: rgba(0,206,201,.12); color: var(--green); font-size: 12px; cursor: pointer; transition: all .15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
 .canvas-action-btn:hover { background: rgba(0,206,201,.25); transform: translateY(-1px); }
 
-/* Inline editing */
+/* === InteractiveEngine styles === */
+
+/* Inline edit input */
+.bs-input { width: 100%; background: var(--surface2); border: 1px solid var(--accent); color: var(--text); border-radius: 4px; padding: 3px 6px; font-family: inherit; font-size: inherit; outline: none; box-sizing: border-box; }
+textarea.bs-input { resize: vertical; min-height: 48px; line-height: 1.4; }
+.bs-svg-input { width: 100%; height: 100%; background: var(--surface2); border: 1px solid var(--accent); color: var(--text); border-radius: 4px; padding: 1px 4px; font-size: inherit; outline: none; }
+
+/* Editing state */
+.bs-editing { outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 3px; }
+
+/* Interactive cursor hints */
+.bs-interactive { cursor: pointer; }
+.bs-interactive:hover { opacity: 0.85; }
+[data-edit]:hover, [data-edit-multiline]:hover { background: rgba(108,92,231,.08); border-radius: 3px; }
+[data-toggle]:hover { opacity: 0.8; }
+[data-cycle]:hover { opacity: 0.8; }
+
+/* Add button — hover-reveal */
+.bs-add-btn { position: absolute; bottom: -4px; right: -4px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--accent); background: var(--surface2); color: var(--accent); font-size: 14px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .15s, transform .1s; display: flex; align-items: center; justify-content: center; z-index: 5; padding: 0; }
+*:hover > .bs-add-btn { opacity: 0.7; }
+.bs-add-btn:hover { opacity: 1 !important; transform: scale(1.15); background: var(--accent); color: white; }
+
+/* Add zone — click target */
+.bs-add-zone { font-size: 11px; color: var(--text2); cursor: pointer; padding: 6px 10px; text-align: center; transition: all .15s; border: 1px dashed transparent; border-radius: 6px; margin-top: 6px; opacity: 0.5; }
+.bs-add-zone:hover { color: var(--accent); border-color: var(--accent); opacity: 1; background: rgba(108,92,231,.06); }
+.bs-add-zone-sm { padding: 3px 8px; font-size: 10px; margin-top: 4px; }
+
+/* Delete button — hover-reveal */
+.bs-delete-btn { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--red); background: var(--surface); color: var(--red); font-size: 12px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .15s; display: flex; align-items: center; justify-content: center; z-index: 5; padding: 0; }
+*:hover > .bs-delete-btn { opacity: 0.5; }
+.bs-delete-btn:hover { opacity: 1 !important; background: var(--red); color: white; }
+
+/* Drag feedback */
+.bs-draggable { cursor: grab; }
+.bs-draggable:active { cursor: grabbing; }
+.bs-dragging { opacity: 0.5; }
+.bs-drag-over { background: rgba(108,92,231,.1) !important; outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 6px; }
+
+/* SVG add button group */
+.bs-svg-add { opacity: 0; transition: opacity .15s; }
+.mindmap-svg:hover .bs-svg-add { opacity: 0.6; }
+.bs-svg-add:hover { opacity: 1 !important; }
+
+/* SVG node group delete hover */
+.bs-node-group { cursor: default; }
+
+/* Edit code button for diagram */
+.bs-edit-code-btn { position: absolute; top: 6px; right: 6px; font-size: 10px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; opacity: 0; transition: opacity .15s; z-index: 3; }
+.artifact-body:hover .bs-edit-code-btn { opacity: 0.7; }
+.bs-edit-code-btn:hover { opacity: 1 !important; color: var(--accent); border-color: var(--accent); }
+
+/* Presentation add slide button */
+.bs-add-slide-btn { font-size: 12px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--text2); cursor: pointer; margin-left: 8px; }
+.bs-add-slide-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Legacy compat */
 .cell-editing { outline: 2px solid var(--accent); outline-offset: -1px; }
-.node-editing input { background: var(--surface2); border: 1px solid var(--accent); color: var(--text); border-radius: 4px; padding: 2px 6px; font-family: inherit; font-size: inherit; outline: none; }
-.checklist-check.interactive { cursor: pointer; }
-.checklist-check.interactive:hover { border-color: var(--green); }
+.checklist-check { cursor: pointer; }
+.checklist-check:hover { border-color: var(--green); }
 .kanban-card.dragging { opacity: .6; }
 .kanban-col.drag-over { background: rgba(108,92,231,.05); border-radius: 6px; }
-.add-row-btn, .add-col-btn { font-size: 11px; color: var(--text2); cursor: pointer; padding: 4px 8px; text-align: center; transition: color .15s; }
-.add-row-btn:hover, .add-col-btn:hover { color: var(--accent2); }
 
 /* Viz picker reference section */
 .viz-references { margin-bottom: 16px; }

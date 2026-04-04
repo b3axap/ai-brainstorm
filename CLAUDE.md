@@ -201,8 +201,21 @@ All renderers use CSS variables for theming:
 --bg: #0f1117        --surface: #1a1d27      --surface2: #232733
 --accent: #6c5ce7    --accent2: #a29bfe      --green: #00cec9
 --orange: #fdcb6e    --pink: #fd79a8         --red: #ff6b6b
---blue: #74b9ff      --text: #e4e7f0         --text2: #8b90a0
+--blue: #74b9ff      --text: #e4e7f0         --text2: #9ea3b5
 ```
+
+Placeholder color: `#6a7086` (dedicated, no opacity reduction).
+
+## Accessibility (WCAG 2.1 AA)
+
+The app follows WCAG 2.1 AA guidelines:
+
+- **Contrast**: `--text2` (#9ea3b5) achieves ≥4.5:1 on all surface colors. Placeholder text (#6a7086) achieves ≥3:1.
+- **Focus indicators**: All interactive elements have `:focus-visible` outlines (2px solid `--accent2`, 2px offset). Inputs get a box-shadow ring.
+- **Semantic HTML**: `<header>`, `<main>`, `<aside>`, `<section>`, `<nav>` landmarks. Room code is a `<button>` not a span.
+- **ARIA attributes**: `aria-label` on inputs without visible labels, `aria-live="polite"` on chat messages and toast, `role="alert"` on error messages, `role="dialog" aria-modal="true"` on modals.
+- **Touch targets**: Mobile buttons enforce `min-height: 44px` via media query.
+- **Resize handle**: Has `role="separator"`, `tabindex="0"`, keyboard-accessible.
 
 ## Concurrency Model
 

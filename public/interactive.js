@@ -1,21 +1,26 @@
-// interactive.js — Interactive layer for artifact renderers
-// Adds inline editing, click-to-expand, and drag capabilities to rendered artifacts
+// interactive.js — InteractiveEngine: universal interactivity via data-attributes
+// Renderers declare WHAT is interactive, engine handles HOW
 
-class InteractiveLayer {
+class InteractiveEngine {
   constructor(card, artifact, socket) {
     this.card = card;
     this.artifact = artifact;
     this.socket = socket;
-    this.roomId = null; // set from state
+    this.roomId = (typeof state !== 'undefined' && state.roomId) ? state.roomId : null;
+    this.body = card.querySelector('.artifact-body');
+    if (!this.body) return;
 
-    // Get roomId from global state
-    if (typeof state !== 'undefined' && state.roomId) {
-      this.roomId = state.roomId;
+    // Clean up previous engine instance
+    if (this.body._bsEngine) {
+      this.body._bsEngine.destroy();
     }
+    this.body._bsEngine = this;
 
-    this.attachRendererInteractivity();
+    this._listeners = [];
+    this.scan();
   }
 
+  // --- Core: emit patch to server ---
   emitPatch(path, value) {
     if (!this.roomId) return;
     this.socket.emit('artifact-data-patch', {
@@ -25,208 +30,370 @@ class InteractiveLayer {
     });
   }
 
-  attachRendererInteractivity() {
-    const type = this.artifact.renderer || this.artifact.type;
-    switch (type) {
-      case 'mindmap': this.setupMindmapInteractivity(); break;
-      case 'table': this.setupTableInteractivity(); break;
-      case 'checklist': this.setupChecklistInteractivity(); break;
-      case 'kanban': this.setupKanbanInteractivity(); break;
-    }
-  }
-
-  // --- MIND MAP: double-click to edit labels ---
-  setupMindmapInteractivity() {
-    const body = this.card.querySelector('.artifact-body');
-    if (!body) return;
-
-    body.addEventListener('dblclick', (e) => {
-      const textEl = e.target.closest('text');
-      if (!textEl) return;
-      e.stopPropagation();
-
-      const svg = body.querySelector('svg');
-      if (!svg) return;
-
-      const currentText = textEl.textContent;
-      const bbox = textEl.getBBox();
-
-      // Create foreignObject with input
-      const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-      fo.setAttribute('x', bbox.x - 4);
-      fo.setAttribute('y', bbox.y - 2);
-      fo.setAttribute('width', Math.max(bbox.width + 20, 80));
-      fo.setAttribute('height', bbox.height + 8);
-
-      const input = document.createElement('input');
-      input.className = 'node-editing';
-      input.value = currentText;
-      input.style.cssText = 'width:100%;height:100%;background:var(--surface2);border:1px solid var(--accent);color:var(--text);border-radius:4px;padding:1px 4px;font-size:inherit;outline:none;';
-
-      fo.appendChild(input);
-      svg.appendChild(fo);
-      input.focus();
-      input.select();
-
-      const finish = () => {
-        const newVal = input.value.trim();
-        fo.remove();
-        if (newVal && newVal !== currentText) {
-          textEl.textContent = newVal;
-          // Find which branch/child this text belongs to and patch
-          this.patchMindmapLabel(currentText, newVal);
-        }
-      };
-
-      input.onblur = finish;
-      input.onkeydown = (ev) => {
-        if (ev.key === 'Enter') { ev.preventDefault(); finish(); }
-        if (ev.key === 'Escape') { fo.remove(); }
-      };
+  // --- Core: emit array operation to server ---
+  emitArrayOp(type, path, value, toPath) {
+    if (!this.roomId) return;
+    this.socket.emit('artifact-array-op', {
+      roomId: this.roomId,
+      artifactId: this.artifact.id,
+      op: { type, path, value, toPath }
     });
   }
 
-  patchMindmapLabel(oldLabel, newLabel) {
-    const data = this.artifact.data;
-    if (!data || !data.branches) return;
+  // --- Resolve a dot-path on artifact data ---
+  getByPath(path) {
+    const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+    let obj = this.artifact.data;
+    for (const p of parts) {
+      if (obj == null) return undefined;
+      obj = obj[p];
+    }
+    return obj;
+  }
 
-    if (data.center === oldLabel) {
-      this.emitPatch('center', newLabel);
+  // --- Scan container for data-attributes and attach handlers ---
+  scan() {
+    this.attachEditHandlers();
+    this.attachMultilineEditHandlers();
+    this.attachToggleHandlers();
+    this.attachCycleHandlers();
+    this.attachAddHandlers();
+    this.attachDeleteHandlers();
+    this.attachDragHandlers();
+    this.attachIframeHandlers();
+    this.attachCustomEvents();
+  }
+
+  // --- INLINE EDIT: data-edit="path" ---
+  attachEditHandlers() {
+    const els = this.body.querySelectorAll('[data-edit]');
+    els.forEach(el => {
+      const handler = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (el.querySelector('.bs-input') || el.closest('.bs-editing')) return;
+        this.startInlineEdit(el, el.dataset.edit, false);
+      };
+      el.addEventListener('dblclick', handler);
+      this._listeners.push([el, 'dblclick', handler]);
+      el.style.cursor = 'text';
+      el.title = 'Double-click to edit';
+    });
+  }
+
+  // --- MULTILINE EDIT: data-edit-multiline="path" ---
+  attachMultilineEditHandlers() {
+    const els = this.body.querySelectorAll('[data-edit-multiline]');
+    els.forEach(el => {
+      const handler = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (el.querySelector('.bs-input') || el.closest('.bs-editing')) return;
+        this.startInlineEdit(el, el.dataset.editMultiline, true);
+      };
+      el.addEventListener('dblclick', handler);
+      this._listeners.push([el, 'dblclick', handler]);
+      el.style.cursor = 'text';
+      el.title = 'Double-click to edit';
+    });
+  }
+
+  startInlineEdit(el, path, multiline) {
+    // Detect SVG context
+    if (el instanceof SVGElement || el.closest('svg')) {
+      this.startSvgEdit(el, path);
       return;
     }
 
-    for (let i = 0; i < data.branches.length; i++) {
-      const branch = data.branches[i];
-      if (branch.label === oldLabel) {
-        this.emitPatch(`branches.${i}.label`, newLabel);
-        return;
-      }
-      if (branch.children) {
-        for (let j = 0; j < branch.children.length; j++) {
-          const child = branch.children[j];
-          const childLabel = typeof child === 'string' ? child : child.label;
-          if (childLabel === oldLabel) {
-            if (typeof child === 'string') {
-              this.emitPatch(`branches.${i}.children.${j}`, newLabel);
-            } else {
-              this.emitPatch(`branches.${i}.children.${j}.label`, newLabel);
-            }
-            return;
-          }
-        }
-      }
+    el.classList.add('bs-editing');
+    const currentVal = this.getByPath(path);
+    const displayVal = currentVal != null ? String(currentVal) : el.textContent;
+
+    const input = multiline
+      ? document.createElement('textarea')
+      : document.createElement('input');
+    input.className = 'bs-input';
+    input.value = displayVal;
+    if (multiline) {
+      input.rows = Math.max(3, displayVal.split('\n').length + 1);
     }
+
+    // Save original content
+    const originalHTML = el.innerHTML;
+    el.innerHTML = '';
+    el.appendChild(input);
+    input.focus();
+    input.select();
+
+    const finish = (save) => {
+      if (input._finished) return;
+      input._finished = true;
+      const newVal = input.value.trim();
+      el.classList.remove('bs-editing');
+
+      if (save && newVal && newVal !== displayVal) {
+        // Check if value should be numeric
+        const numVal = Number(newVal);
+        const isNumericPath = typeof currentVal === 'number';
+        this.emitPatch(path, isNumericPath && !isNaN(numVal) ? numVal : newVal);
+      } else {
+        el.innerHTML = originalHTML;
+      }
+    };
+
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && !multiline) { ev.preventDefault(); finish(true); }
+      if (ev.key === 'Enter' && multiline && ev.ctrlKey) { ev.preventDefault(); finish(true); }
+      if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    });
   }
 
-  // --- TABLE: double-click to edit cells, add row/column ---
-  setupTableInteractivity() {
-    const body = this.card.querySelector('.artifact-body');
-    if (!body) return;
-    const data = this.artifact.data;
-    if (!data || !data.rows) return;
+  startSvgEdit(el, path) {
+    const svg = el.closest('svg');
+    if (!svg) return;
 
-    // Double-click to edit cells
-    body.addEventListener('dblclick', (e) => {
-      const td = e.target.closest('td');
-      if (!td || td.querySelector('input')) return;
-      e.stopPropagation();
+    const currentVal = this.getByPath(path);
+    const displayVal = currentVal != null ? String(currentVal) : el.textContent;
+    const bbox = el.getBBox();
 
-      const tr = td.parentElement;
-      const table = tr.closest('table');
-      const rowIdx = Array.from(table.querySelectorAll('tbody tr')).indexOf(tr);
-      const colIdx = Array.from(tr.children).indexOf(td);
-      if (rowIdx < 0 || colIdx < 0) return;
+    const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+    fo.setAttribute('x', bbox.x - 4);
+    fo.setAttribute('y', bbox.y - 2);
+    fo.setAttribute('width', Math.max(bbox.width + 30, 80));
+    fo.setAttribute('height', bbox.height + 8);
 
-      const currentVal = td.textContent;
-      td.classList.add('cell-editing');
+    const input = document.createElement('input');
+    input.className = 'bs-input bs-svg-input';
+    input.value = displayVal;
+    fo.appendChild(input);
+    svg.appendChild(fo);
+    input.focus();
+    input.select();
 
-      const input = document.createElement('input');
-      input.className = 'input';
-      input.value = currentVal;
-      input.style.cssText = 'font-size:12px;padding:4px 6px;width:100%;';
-      td.textContent = '';
-      td.appendChild(input);
-      input.focus();
-      input.select();
+    const finish = (save) => {
+      if (input._finished) return;
+      input._finished = true;
+      fo.remove();
+      const newVal = input.value.trim();
+      if (save && newVal && newVal !== displayVal) {
+        this.emitPatch(path, newVal);
+      }
+    };
 
-      const finish = () => {
-        const newVal = input.value.trim();
-        td.classList.remove('cell-editing');
-        td.textContent = newVal || currentVal;
-        if (newVal && newVal !== currentVal) {
-          const cell = data.rows[rowIdx][colIdx];
-          if (typeof cell === 'object' && cell !== null) {
-            this.emitPatch(`rows.${rowIdx}.${colIdx}.text`, newVal);
-          } else {
-            this.emitPatch(`rows.${rowIdx}.${colIdx}`, newVal);
-          }
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+      if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    });
+  }
+
+  // --- TOGGLE: data-toggle="path" ---
+  attachToggleHandlers() {
+    const els = this.body.querySelectorAll('[data-toggle]');
+    els.forEach(el => {
+      el.classList.add('bs-interactive');
+      el.style.cursor = 'pointer';
+      const handler = (e) => {
+        e.stopPropagation();
+        const path = el.dataset.toggle;
+        const current = this.getByPath(path);
+        this.emitPatch(path, !current);
+      };
+      el.addEventListener('click', handler);
+      this._listeners.push([el, 'click', handler]);
+    });
+  }
+
+  // --- CYCLE: data-cycle="path" data-cycle-values='["a","b","c"]' ---
+  attachCycleHandlers() {
+    const els = this.body.querySelectorAll('[data-cycle]');
+    els.forEach(el => {
+      el.classList.add('bs-interactive');
+      el.style.cursor = 'pointer';
+      const handler = (e) => {
+        e.stopPropagation();
+        const path = el.dataset.cycle;
+        let values;
+        try { values = JSON.parse(el.dataset.cycleValues); } catch { return; }
+        if (!Array.isArray(values) || !values.length) return;
+        const current = this.getByPath(path);
+        const idx = values.indexOf(current);
+        const next = values[(idx + 1) % values.length];
+        this.emitPatch(path, next);
+      };
+      el.addEventListener('click', handler);
+      this._listeners.push([el, 'click', handler]);
+    });
+  }
+
+  // --- ADD: data-add="arrayPath" data-add-template='json' ---
+  attachAddHandlers() {
+    const els = this.body.querySelectorAll('[data-add]');
+    els.forEach(el => {
+      // Don't add button if already exists
+      if (el.querySelector('.bs-add-btn')) return;
+
+      const btn = document.createElement('button');
+      btn.className = 'bs-add-btn';
+      btn.textContent = '+';
+      btn.title = 'Add item';
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const arrayPath = el.dataset.add;
+        let template = '';
+        try {
+          template = el.dataset.addTemplate ? JSON.parse(el.dataset.addTemplate) : '';
+        } catch {
+          template = '';
+        }
+        this.emitArrayOp('insert', arrayPath, template);
+      });
+      el.style.position = 'relative';
+      el.appendChild(btn);
+    });
+  }
+
+  // --- DELETE: data-delete="path" ---
+  attachDeleteHandlers() {
+    const els = this.body.querySelectorAll('[data-delete]');
+    els.forEach(el => {
+      if (el.querySelector('.bs-delete-btn')) return;
+
+      const btn = document.createElement('button');
+      btn.className = 'bs-delete-btn';
+      btn.textContent = '×';
+      btn.title = 'Remove';
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const path = el.dataset.delete;
+        this.emitArrayOp('remove', path);
+      });
+      el.style.position = 'relative';
+      el.appendChild(btn);
+    });
+  }
+
+  // --- DRAG: data-drag-item="path" + data-drag-target="arrayPath" ---
+  attachDragHandlers() {
+    const items = this.body.querySelectorAll('[data-drag-item]');
+    const targets = this.body.querySelectorAll('[data-drag-target]');
+
+    items.forEach(el => {
+      el.draggable = true;
+      el.classList.add('bs-draggable');
+
+      const dragStart = (e) => {
+        el.classList.add('bs-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', el.dataset.dragItem);
+      };
+      const dragEnd = () => el.classList.remove('bs-dragging');
+
+      el.addEventListener('dragstart', dragStart);
+      el.addEventListener('dragend', dragEnd);
+      this._listeners.push([el, 'dragstart', dragStart]);
+      this._listeners.push([el, 'dragend', dragEnd]);
+    });
+
+    targets.forEach(container => {
+      const dragOver = (e) => {
+        e.preventDefault();
+        container.classList.add('bs-drag-over');
+      };
+      const dragLeave = () => container.classList.remove('bs-drag-over');
+      const drop = (e) => {
+        e.preventDefault();
+        container.classList.remove('bs-drag-over');
+        const fromPath = e.dataTransfer.getData('text/plain');
+        const toPath = container.dataset.dragTarget;
+        if (fromPath && toPath) {
+          this.emitArrayOp('move', fromPath, null, toPath);
         }
       };
 
-      input.onblur = finish;
-      input.onkeydown = (ev) => {
-        if (ev.key === 'Enter') { ev.preventDefault(); finish(); }
-        if (ev.key === 'Escape') { td.textContent = currentVal; td.classList.remove('cell-editing'); }
-      };
+      container.addEventListener('dragover', dragOver);
+      container.addEventListener('dragleave', dragLeave);
+      container.addEventListener('drop', drop);
+      this._listeners.push([container, 'dragover', dragOver]);
+      this._listeners.push([container, 'dragleave', dragLeave]);
+      this._listeners.push([container, 'drop', drop]);
     });
   }
 
-  // --- CHECKLIST: click to toggle done ---
-  setupChecklistInteractivity() {
-    const body = this.card.querySelector('.artifact-body');
-    if (!body) return;
-    const data = this.artifact.data;
-    if (!data || !data.items) return;
+  // --- IFRAME: listen for postMessage from freeform/html_guide iframes ---
+  attachIframeHandlers() {
+    const type = this.artifact.renderer || this.artifact.type;
+    if (type !== 'freeform' && type !== 'html_guide') return;
 
-    body.querySelectorAll('.checklist-check').forEach((check, idx) => {
-      check.classList.add('interactive');
-      check.onclick = (e) => {
-        e.stopPropagation();
-        const item = data.items[idx];
-        if (!item) return;
-        const newDone = !item.done;
-        this.emitPatch(`items.${idx}.done`, newDone);
-      };
-    });
+    const iframe = this.body.querySelector('iframe');
+    if (!iframe) return;
+
+    const handler = (e) => {
+      // Verify message comes from our iframe
+      if (e.source !== iframe.contentWindow) return;
+      const msg = e.data;
+      if (!msg || !msg.type) return;
+
+      switch (msg.type) {
+        case 'bs-patch':
+          if (msg.path != null && msg.value !== undefined) {
+            this.emitPatch(msg.path, msg.value);
+          }
+          break;
+        case 'bs-array-op':
+          if (msg.op) {
+            this.emitArrayOp(msg.op.type, msg.op.path, msg.op.value, msg.op.toPath);
+          }
+          break;
+        case 'bs-get-data':
+          iframe.contentWindow.postMessage({
+            type: 'bs-data-response',
+            data: this.artifact.data
+          }, '*');
+          break;
+      }
+    };
+
+    window.addEventListener('message', handler);
+    this._listeners.push([window, 'message', handler]);
+
+    // Forward updates to iframe
+    this._iframeForward = (data) => {
+      try {
+        iframe.contentWindow.postMessage({ type: 'bs-data-update', data }, '*');
+      } catch {}
+    };
   }
 
-  // --- KANBAN: drag cards between columns ---
-  setupKanbanInteractivity() {
-    const body = this.card.querySelector('.artifact-body');
-    if (!body) return;
-    const data = this.artifact.data;
-    if (!data || !data.columns) return;
+  // --- Custom events from renderers (e.g. presentation add-slide) ---
+  attachCustomEvents() {
+    const handler = (e) => {
+      if (e.type === 'bs-add-slide') {
+        this.emitArrayOp('insert', 'slides', { title: 'New Slide', bullets: ['Point 1'] });
+      }
+    };
+    this.body.addEventListener('bs-add-slide', handler);
+    this._listeners.push([this.body, 'bs-add-slide', handler]);
+  }
 
-    const cards = body.querySelectorAll('.kanban-card');
-    const cols = body.querySelectorAll('.kanban-cards');
+  // Forward data update to iframe if applicable
+  forwardUpdate(data) {
+    if (this._iframeForward) this._iframeForward(data);
+  }
 
-    cards.forEach(card => {
-      card.draggable = true;
-      card.addEventListener('dragstart', (e) => {
-        card.classList.add('dragging');
-        e.dataTransfer.setData('text/plain', card.querySelector('.kanban-card-title').textContent);
-      });
-      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+  // --- Cleanup ---
+  destroy() {
+    this._listeners.forEach(([el, evt, fn]) => {
+      el.removeEventListener(evt, fn);
     });
-
-    cols.forEach((col, colIdx) => {
-      col.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        col.classList.add('drag-over');
-      });
-      col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
-      col.addEventListener('drop', (e) => {
-        e.preventDefault();
-        col.classList.remove('drag-over');
-        const dragging = body.querySelector('.kanban-card.dragging');
-        if (!dragging) return;
-        col.appendChild(dragging);
-        // Note: full data sync happens via artifact-action expand/ask
-        // This is visual-only for now; a proper implementation would track card indices
-      });
-    });
+    this._listeners = [];
+    if (this.body) this.body._bsEngine = null;
   }
 }
 
-// Expose globally
-window.InteractiveLayer = InteractiveLayer;
+// Backward compatibility alias
+window.InteractiveLayer = InteractiveEngine;
+window.InteractiveEngine = InteractiveEngine;
