@@ -560,7 +560,8 @@ function renderArtifactCard(artifact) {
 
   card.innerHTML = `
     <div class="artifact-actions">
-      <button class="art-action-btn" data-action="expand" title="Expand / deepen">⊕ Expand</button>
+      <button class="art-action-btn" data-action="open" title="Open in expanded view">⊞ Open</button>
+      <button class="art-action-btn" data-action="expand" title="AI: add more detail">⊕ AI Expand</button>
       <button class="art-action-btn" data-action="transform" title="Convert to another type">⟲ Transform</button>
       <button class="art-action-btn" data-action="ask" title="Ask about this">? Ask</button>
       <button class="art-action-btn" data-action="copy" title="Copy data to clipboard">⎘ Copy</button>
@@ -611,7 +612,20 @@ function renderArtifactCard(artifact) {
 }
 
 function setupArtifactActions(card, artifact) {
-  // Action buttons
+  // Open in expand popup
+  card.querySelector('[data-action="open"]').onclick = (e) => {
+    e.stopPropagation();
+    openArtifactExpand(artifact.id);
+  };
+
+  // Double-click on header opens expand popup
+  card.querySelector('.artifact-head').addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    openArtifactExpand(artifact.id);
+  });
+
+  // AI Expand (ask Claude to add detail)
   card.querySelector('[data-action="expand"]').onclick = (e) => {
     e.stopPropagation();
     showArtifactUpdating(card);
@@ -1015,6 +1029,11 @@ socket.on('artifact-updated', ({ artifactId, data, title }) => {
     }
   }
 
+  // Refresh expand popup if open for this artifact
+  if (expandState.artifactId === artifactId) {
+    refreshExpandPopup();
+  }
+
   showToast(`${art.icon || '📄'} ${art.title} updated!`);
 });
 
@@ -1035,6 +1054,218 @@ socket.on('generation-error', ({ message }) => {
   document.getElementById('typingIndicator').classList.remove('visible');
   // Remove any updating overlays
   document.querySelectorAll('.artifact-updating').forEach(el => el.remove());
+});
+
+// --- Artifact Expand Popup ---
+let expandState = { artifactId: null, engine: null };
+
+function openArtifactExpand(artifactId) {
+  const art = state.artifacts.find(a => a.id === artifactId);
+  if (!art) return;
+
+  expandState.artifactId = artifactId;
+
+  const modal = document.getElementById('artifactExpandModal');
+  const content = modal.querySelector('.expand-content');
+  const header = modal.querySelector('.expand-header');
+
+  // Set header
+  header.querySelector('.expand-icon').textContent = art.icon || '📄';
+  header.querySelector('.expand-title').textContent = art.title || 'Untitled';
+  header.querySelector('.expand-type-badge').textContent = art.renderer || art.type;
+
+  // Render artifact in popup
+  renderArtifact(art.renderer || art.type, art.data, content);
+
+  // Attach InteractiveEngine to the expand-body (using a virtual card wrapper)
+  if (expandState.engine) expandState.engine.destroy();
+  const bodyWrap = modal.querySelector('.expand-body');
+  // InteractiveEngine expects card.querySelector('.artifact-body') — use expand-body as card
+  const fakeCard = { querySelector: (sel) => sel === '.artifact-body' ? bodyWrap : null };
+  if (window.InteractiveEngine) {
+    expandState.engine = new InteractiveEngine(fakeCard, art, socket);
+  }
+
+  // Show
+  modal.classList.add('active');
+
+  // Setup toolbar actions
+  setupExpandToolbar(art);
+  setupExpandAskBar(art);
+}
+
+function closeArtifactExpand() {
+  const modal = document.getElementById('artifactExpandModal');
+  modal.classList.remove('active');
+  if (expandState.engine) {
+    expandState.engine.destroy();
+    expandState.engine = null;
+  }
+  expandState.artifactId = null;
+  // Clean up transform dropdown
+  const dd = modal.querySelector('.expand-transform-dropdown');
+  if (dd) dd.remove();
+}
+
+function refreshExpandPopup() {
+  if (!expandState.artifactId) return;
+  const art = state.artifacts.find(a => a.id === expandState.artifactId);
+  if (!art) { closeArtifactExpand(); return; }
+
+  const modal = document.getElementById('artifactExpandModal');
+  const content = modal.querySelector('.expand-content');
+
+  // Update header
+  modal.querySelector('.expand-title').textContent = art.title || 'Untitled';
+
+  // Re-render content
+  renderArtifact(art.renderer || art.type, art.data, content);
+
+  // Re-attach engine
+  if (expandState.engine) expandState.engine.destroy();
+  const bodyWrap = modal.querySelector('.expand-body');
+  const fakeCard = { querySelector: (sel) => sel === '.artifact-body' ? bodyWrap : null };
+  if (window.InteractiveEngine) {
+    expandState.engine = new InteractiveEngine(fakeCard, art, socket);
+    expandState.engine.forwardUpdate(art.data);
+  }
+
+  // Remove loading overlay
+  const loading = modal.querySelector('.expand-loading');
+  if (loading) loading.remove();
+}
+
+function setupExpandToolbar(artifact) {
+  const modal = document.getElementById('artifactExpandModal');
+
+  // AI Expand
+  modal.querySelector('[data-expand-action="ai-expand"]').onclick = () => {
+    showExpandLoading();
+    socket.emit('artifact-action', { roomId: state.roomId, artifactId: artifact.id, action: 'expand' });
+  };
+
+  // Transform
+  const transformBtn = modal.querySelector('[data-expand-action="transform"]');
+  transformBtn.onclick = () => {
+    const existing = modal.querySelector('.expand-transform-dropdown');
+    if (existing) { existing.remove(); return; }
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'expand-transform-dropdown';
+    state.agents.forEach(agent => {
+      if (agent.id === artifact.type) return;
+      const opt = document.createElement('div');
+      opt.className = 'expand-transform-option';
+      opt.innerHTML = `${agent.icon} ${escHtml(agent.name)}`;
+      opt.onclick = () => {
+        dropdown.remove();
+        closeArtifactExpand();
+        socket.emit('artifact-action', {
+          roomId: state.roomId,
+          artifactId: artifact.id,
+          action: 'transform',
+          payload: { targetType: agent.id }
+        });
+        showToast(`Transforming to ${agent.name}...`);
+      };
+      dropdown.appendChild(opt);
+    });
+    transformBtn.style.position = 'relative';
+    transformBtn.appendChild(dropdown);
+
+    setTimeout(() => {
+      document.addEventListener('click', function close() {
+        dropdown.remove();
+        document.removeEventListener('click', close);
+      }, { once: true });
+    }, 0);
+  };
+
+  // Copy
+  modal.querySelector('[data-expand-action="copy"]').onclick = () => {
+    const art = state.artifacts.find(a => a.id === expandState.artifactId);
+    if (art) {
+      navigator.clipboard.writeText(JSON.stringify(art.data, null, 2)).then(() => showToast('Copied to clipboard!'));
+    }
+  };
+
+  // PNG screenshot
+  modal.querySelector('[data-expand-action="png"]').onclick = async () => {
+    const art = state.artifacts.find(a => a.id === expandState.artifactId);
+    if (!art) return;
+    const content = modal.querySelector('.expand-content');
+    try {
+      if (typeof html2canvas === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.appendChild(script); });
+      }
+      const canvas = await html2canvas(content, { backgroundColor: '#1a1d27', scale: 2 });
+      const link = document.createElement('a');
+      link.download = `${(art.title || 'artifact').replace(/[^a-z0-9]/gi, '_')}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      showToast('PNG saved!');
+    } catch (err) {
+      showToast('Screenshot failed');
+    }
+  };
+
+  // Delete
+  modal.querySelector('[data-expand-action="delete"]').onclick = () => {
+    const art = state.artifacts.find(a => a.id === expandState.artifactId);
+    if (!art) return;
+    if (confirm(`Delete "${art.title}"?`)) {
+      closeArtifactExpand();
+      socket.emit('delete-artifact', { roomId: state.roomId, artifactId: art.id });
+      // Remove locally
+      state.artifacts = state.artifacts.filter(a => a.id !== art.id);
+      const card = document.getElementById(`artifact-${art.id}`);
+      if (card) card.remove();
+      showToast('Artifact deleted');
+    }
+  };
+}
+
+function setupExpandAskBar(artifact) {
+  const input = document.getElementById('expandAskInput');
+  const btn = document.getElementById('expandAskBtn');
+
+  const submit = () => {
+    const question = input.value.trim();
+    if (!question) return;
+    input.value = '';
+    showExpandLoading();
+    socket.emit('artifact-action', {
+      roomId: state.roomId,
+      artifactId: artifact.id,
+      action: 'ask',
+      payload: { question }
+    });
+  };
+
+  btn.onclick = submit;
+  input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+}
+
+function showExpandLoading() {
+  const body = document.querySelector('#artifactExpandModal .expand-body');
+  if (body.querySelector('.expand-loading')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'expand-loading';
+  overlay.innerHTML = '<div class="gen-spinner"></div>';
+  body.appendChild(overlay);
+}
+
+// Close handlers
+document.getElementById('artifactExpandModal').querySelector('.expand-close').onclick = closeArtifactExpand;
+document.getElementById('artifactExpandModal').addEventListener('click', (e) => {
+  if (e.target.id === 'artifactExpandModal') closeArtifactExpand();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('artifactExpandModal').classList.contains('active')) {
+    closeArtifactExpand();
+  }
 });
 
 // --- Utility ---

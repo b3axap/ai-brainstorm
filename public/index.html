@@ -116,6 +116,35 @@
   </div>
 </div>
 
+<!-- ARTIFACT EXPAND POPUP -->
+<div class="modal-overlay" id="artifactExpandModal" role="dialog" aria-modal="true" aria-label="Expanded artifact view">
+  <div class="expand-modal">
+    <div class="expand-header">
+      <span class="expand-icon"></span>
+      <span class="expand-title"></span>
+      <span class="expand-type-badge"></span>
+      <div class="expand-header-spacer"></div>
+      <button class="expand-close" title="Close (Esc)">&times;</button>
+    </div>
+    <div class="expand-toolbar">
+      <button class="expand-tool-btn" data-expand-action="ai-expand" title="Ask Claude to add more detail"><span class="expand-tool-icon">⊕</span> AI Expand</button>
+      <button class="expand-tool-btn" data-expand-action="transform" title="Convert to another type"><span class="expand-tool-icon">⟲</span> Transform</button>
+      <div class="expand-toolbar-sep"></div>
+      <button class="expand-tool-btn" data-expand-action="copy" title="Copy JSON data"><span class="expand-tool-icon">⎘</span> Copy</button>
+      <button class="expand-tool-btn" data-expand-action="png" title="Save as PNG"><span class="expand-tool-icon">📷</span> PNG</button>
+      <div class="expand-toolbar-sep"></div>
+      <button class="expand-tool-btn expand-tool-danger" data-expand-action="delete" title="Delete this artifact"><span class="expand-tool-icon">🗑</span> Delete</button>
+    </div>
+    <div class="expand-body">
+      <div class="expand-content"></div>
+    </div>
+    <div class="expand-ask-bar">
+      <input class="input" id="expandAskInput" placeholder="Ask about this visualization..." autocomplete="off">
+      <button class="btn btn-primary" id="expandAskBtn">Ask</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
