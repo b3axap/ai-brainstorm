@@ -71,26 +71,44 @@ async function handleChatAnalysis(room, socket) {
     .map(a => `${a.id}: ${a.icon} ${a.name} — ${a.description}`)
     .join('\n');
 
+  const isFirstMessage = room.messages.filter(m => m.role === 'user').length <= 1;
+
   const systemPrompt = `${systemBase}
 
-IMPORTANT: After your conversational response, decide which mode to use:
+RESPONSE STRUCTURE:
 
-MODE 1 — CLARIFY (use when the idea is vague, too broad, or missing key details):
-Ask 2-3 short clarifying questions to better understand the user's idea. Be specific and actionable — don't ask generic questions.
-End your response with a JSON block on its own line:
-{"questions": ["Question 1?", "Question 2?", "Question 3?"]}
+${isFirstMessage ? `This is the user's FIRST message about their idea. Follow this structure strictly:
 
-MODE 2 — SUGGEST (use when the idea is clear enough to visualize):
-Suggest 2-3 visualization types from:
+1. **SUMMARY** — Start with a brief analysis (2-3 sentences). Restate what you understood about the idea, highlight its core value and key aspects. Show that you "get it".
+
+2. **CLARIFYING QUESTIONS** (0 to 3) — Only if genuinely needed. Ask specific, actionable questions about unclear aspects (target audience, scope, key features, constraints). If the idea is already detailed and clear — ask 0 questions. Never ask generic filler questions.
+
+3. **VISUALIZATION SUGGESTIONS** — Always suggest 2-3 visualization types that would be most useful at this stage.` : `This is a follow-up message in an ongoing conversation. Respond naturally and helpfully. Do NOT repeat the summary — just address what the user said and move the brainstorm forward. Always suggest 2-3 visualization types.`}
+
+Available visualization types:
 ${agentList}
-End your response with a JSON block on its own line:
-{"suggest": ["agent_id_1", "agent_id_2"]}
+
+CRITICAL: End your response with a single JSON block on its own line. The JSON must include:
+- "suggest": array of 2-3 agent IDs (ALWAYS required) — these are your recommended visualizations
+- "questions": array of 0-3 clarifying questions (include only if you have questions, omit if 0)
+- "auto": array of agent IDs to auto-generate immediately (optional). Use this when the idea is clear enough and you're confident these visualizations would be valuable. For example, a mind map is almost always useful for a first brainstorm. Can include 1-3 items.
+
+Example — first message, idea is vague:
+{"questions": ["Who is the target audience?", "What's the main differentiator?"], "suggest": ["mindmap", "table"]}
+
+Example — idea is clear, auto-generate a mind map:
+{"suggest": ["mindmap", "presentation", "diagram"], "auto": ["mindmap"]}
+
+Example — detailed idea, auto-generate multiple:
+{"suggest": ["mindmap", "table", "diagram"], "auto": ["mindmap", "table"]}
 
 Rules:
-- Use MODE 1 only for the FIRST message about a new idea if it's genuinely unclear. Once the user has provided enough context (even in follow-ups), switch to MODE 2.
-- If the idea is already detailed and actionable, go straight to MODE 2.
 - The JSON block must be the LAST thing in your response, on its own line.
-- Use ONLY one mode per response, never both.`;
+- ALWAYS include "suggest" with 2-3 agent IDs.
+- In your text response, briefly explain WHY you recommend these specific visualization types (1 sentence each).
+- "auto" should only include visualizations you're highly confident about. When in doubt, let the user choose.
+- Keep your text response concise and focused. No fluff.
+- Use Russian language if the user writes in Russian.`;
 
   try {
     let fullResponse = '';
@@ -109,25 +127,30 @@ Rules:
 
     await stream.finalMessage();
 
-    // Parse JSON block at end: either {"suggest": [...]} or {"questions": [...]}
+    // Parse JSON block at end (unified format with suggest + optional questions + optional auto)
     let suggestedTypes = [];
     let clarifyQuestions = [];
+    let autoGenerate = [];
 
-    const suggestMatch = fullResponse.match(/\{"suggest":\s*\[([^\]]+)\]\}/);
-    const questionsMatch = fullResponse.match(/\{"questions":\s*\[([^\]]+)\]\}/);
-
-    if (suggestMatch) {
+    const jsonMatch = fullResponse.match(/\{[^{}]*"suggest"\s*:\s*\[[^\]]*\][^{}]*\}/);
+    if (jsonMatch) {
       try {
-        suggestedTypes = JSON.parse(suggestMatch[0]).suggest || [];
+        const parsed = JSON.parse(jsonMatch[0]);
+        suggestedTypes = parsed.suggest || [];
+        clarifyQuestions = parsed.questions || [];
+        autoGenerate = parsed.auto || [];
       } catch (e) { /* ignore parse error */ }
-    } else if (questionsMatch) {
-      try {
-        clarifyQuestions = JSON.parse(questionsMatch[0]).questions || [];
-      } catch (e) { /* ignore parse error */ }
+    } else {
+      // Fallback: try separate patterns for backward compatibility
+      const suggestOnly = fullResponse.match(/\{"suggest":\s*\[([^\]]+)\]\}/);
+      const questionsOnly = fullResponse.match(/\{"questions":\s*\[([^\]]+)\]\}/);
+      if (suggestOnly) try { suggestedTypes = JSON.parse(suggestOnly[0]).suggest || []; } catch(e) {}
+      if (questionsOnly) try { clarifyQuestions = JSON.parse(questionsOnly[0]).questions || []; } catch(e) {}
     }
 
-    // Clean response text (remove any JSON block)
+    // Clean response text (remove JSON block)
     const cleanResponse = fullResponse
+      .replace(/\{[^{}]*"suggest"\s*:\s*\[[^\]]*\][^{}]*\}/, '')
       .replace(/\{"suggest":\s*\[[^\]]*\]\}/, '')
       .replace(/\{"questions":\s*\[[^\]]*\]\}/, '')
       .trim();
@@ -145,7 +168,8 @@ Rules:
       roomId: room.id,
       fullMessage: cleanResponse,
       suggestedTypes: suggestedTypes,
-      clarifyQuestions: clarifyQuestions
+      clarifyQuestions: clarifyQuestions,
+      autoGenerate: autoGenerate
     });
 
   } catch (error) {

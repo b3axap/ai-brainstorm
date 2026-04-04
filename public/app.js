@@ -99,65 +99,7 @@ function addChatMessage(message) {
   container.scrollTop = container.scrollHeight;
 }
 
-function addSuggestButtons(suggestedTypes) {
-  const container = document.getElementById('chatMessages');
-  const lastMsg = container.querySelector('.message:last-child');
-  if (!lastMsg) return;
-
-  const existing = lastMsg.querySelector('.suggest-buttons');
-  if (existing) existing.remove();
-
-  const buttonsDiv = document.createElement('div');
-  buttonsDiv.className = 'suggest-buttons';
-
-  // Resolve agent names
-  suggestedTypes.forEach(typeId => {
-    const agent = state.agents.find(a => a.id === typeId);
-    if (!agent) return;
-
-    const btn = document.createElement('button');
-    btn.className = 'suggest-btn';
-    btn.innerHTML = `${agent.icon} ${agent.name}`;
-    btn.onclick = () => {
-      if (state.generating) return;
-      state.generating = true;
-      buttonsDiv.querySelectorAll('.suggest-btn').forEach(b => b.disabled = true);
-      socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
-      showToast(`Generating ${agent.name}...`);
-    };
-    buttonsDiv.appendChild(btn);
-  });
-
-  lastMsg.appendChild(buttonsDiv);
-  container.scrollTop = container.scrollHeight;
-}
-
-function addClarifyQuestions(questions) {
-  const container = document.getElementById('chatMessages');
-  const lastMsg = container.querySelector('.message:last-child');
-  if (!lastMsg) return;
-
-  const existing = lastMsg.querySelector('.clarify-buttons');
-  if (existing) existing.remove();
-
-  const questionsDiv = document.createElement('div');
-  questionsDiv.className = 'clarify-buttons';
-
-  questions.forEach(question => {
-    const btn = document.createElement('button');
-    btn.className = 'clarify-btn';
-    btn.textContent = question;
-    btn.onclick = () => {
-      const input = document.getElementById('chatInput');
-      input.value = question;
-      input.focus();
-    };
-    questionsDiv.appendChild(btn);
-  });
-
-  lastMsg.appendChild(questionsDiv);
-  container.scrollTop = container.scrollHeight;
-}
+// Suggest buttons and clarify questions are now rendered inline in the claude-done handler
 
 // Streaming: Claude response building
 let streamingMsgId = null;
@@ -398,18 +340,102 @@ socket.on('claude-chunk', ({ chunk }) => {
   appendStream(chunk);
 });
 
-socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions }) => {
+socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, autoGenerate }) => {
   endStreaming(fullMessage);
-
-  // Store in messages
-  const assistantMsg = { id: 'a-' + Date.now(), role: 'assistant', content: fullMessage, userName: 'Claude', timestamp: Date.now() };
-  // Don't double-add if streaming already added it
   state.generating = false;
 
-  if (clarifyQuestions && clarifyQuestions.length > 0) {
-    addClarifyQuestions(clarifyQuestions);
-  } else if (suggestedTypes && suggestedTypes.length > 0) {
-    addSuggestButtons(suggestedTypes);
+  const container = document.getElementById('chatMessages');
+  const lastMsg = container.querySelector('.message:last-child');
+  if (!lastMsg) return;
+
+  const hasQuestions = clarifyQuestions && clarifyQuestions.length > 0;
+  const hasSuggestions = suggestedTypes && suggestedTypes.length > 0;
+  const hasAuto = autoGenerate && autoGenerate.length > 0;
+
+  // If auto-generate is requested, launch those artifacts immediately
+  if (hasAuto) {
+    const autoNames = autoGenerate
+      .map(id => state.agents.find(a => a.id === id))
+      .filter(Boolean)
+      .map(a => `${a.icon} ${a.name}`);
+
+    if (autoNames.length > 0) {
+      const autoMsg = document.createElement('div');
+      autoMsg.className = 'auto-generate-notice';
+      autoMsg.textContent = `Generating: ${autoNames.join(', ')}...`;
+      lastMsg.appendChild(autoMsg);
+
+      autoGenerate.forEach(typeId => {
+        const agent = state.agents.find(a => a.id === typeId);
+        if (agent) {
+          socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
+        }
+      });
+    }
+  }
+
+  // Build action buttons for remaining suggestions
+  if (hasQuestions || hasSuggestions) {
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'claude-actions';
+
+    if (hasQuestions) {
+      const qLabel = document.createElement('div');
+      qLabel.className = 'actions-label';
+      qLabel.textContent = '\u2753 Clarifying questions:';
+      actionsDiv.appendChild(qLabel);
+
+      const questionsDiv = document.createElement('div');
+      questionsDiv.className = 'clarify-buttons';
+      clarifyQuestions.forEach(question => {
+        const btn = document.createElement('button');
+        btn.className = 'clarify-btn';
+        btn.textContent = question;
+        btn.onclick = () => {
+          const input = document.getElementById('chatInput');
+          input.value = question;
+          input.focus();
+        };
+        questionsDiv.appendChild(btn);
+      });
+      actionsDiv.appendChild(questionsDiv);
+    }
+
+    if (hasSuggestions) {
+      // Filter out already auto-generated types
+      const remainingTypes = hasAuto
+        ? suggestedTypes.filter(t => !autoGenerate.includes(t))
+        : suggestedTypes;
+
+      if (remainingTypes.length > 0) {
+        const sLabel = document.createElement('div');
+        sLabel.className = 'actions-label';
+        sLabel.textContent = hasAuto ? 'Also available:' : (hasQuestions ? '\u2728 Or generate right away:' : '\u2728 Suggested visualizations:');
+        actionsDiv.appendChild(sLabel);
+
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'suggest-buttons';
+        remainingTypes.forEach(typeId => {
+          const agent = state.agents.find(a => a.id === typeId);
+          if (!agent) return;
+          const btn = document.createElement('button');
+          btn.className = 'suggest-btn';
+          btn.innerHTML = `${agent.icon} ${agent.name}`;
+          btn.onclick = () => {
+            if (state.generating) return;
+            state.generating = true;
+            buttonsDiv.querySelectorAll('.suggest-btn').forEach(b => b.disabled = true);
+            socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
+            showToast(`Generating ${agent.name}...`);
+          };
+          buttonsDiv.appendChild(btn);
+        });
+        actionsDiv.appendChild(buttonsDiv);
+      }
+    }
+
+    lastMsg.appendChild(actionsDiv);
+    container.scrollTop = container.scrollHeight;
   }
 });
 
