@@ -113,36 +113,72 @@
 
 ## Screens
 
+> **Figma file:** https://www.figma.com/design/JvFIp4Sm1myT84L8898BWV/AI-Brainstorm-UI-Design
+
 ### 1. Landing Page (1440x900)
-Centered card (400px wide) on `--bg` background. Contains: title with emoji, subtitle, name input, "Create New Room" primary button, "or join existing" divider, room code input + join button.
+Centered card (400px wide) on `--bg` background. Contains: title with brain emoji, subtitle "Collaborative AI-powered idea visualization", name input with uppercase label, "Create New Room" primary button (full-width), "or join existing" divider, room code input (monospace, uppercase) + "Join Room" button.
 
-### 2. Chat Screen (1440x900)
-- **Header (52px):** room code badge, user list, "Canvas ->" button
-- **Messages Area:** alternating user (right-aligned, purple) and assistant (left-aligned, surface2) bubbles. Suggest buttons appear below assistant messages.
-- **Typing Indicator:** "Claude is thinking..." in accent2
-- **Input Bar:** text input + "Send" primary button
+### 2. Workspace — Split-View (1440x900)
+- **Header (48px):** room code badge (monospace, copyable), user list with names, spacer, "+ New Visualization" button (primary)
+- **Layout:** CSS Grid `350px | 4px | 1fr` — chat panel (left) + resize handle + canvas panel (right)
+- **Chat Panel (left):**
+  - Messages area with alternating user (right-aligned, `--accent` bg) and Claude (left-aligned, `--surface2` bg) bubbles
+  - Clarifying questions with `?` prefix in `--accent` color + clickable option pill buttons
+  - Canvas offer section (green-tinted) with suggested visualization buttons + "Choose more visualizations..." link
+  - Canvas action buttons (green border, confirm intent)
+  - Typing indicator in `--accent2`
+  - Input bar: text input + "Send" primary button
+- **Canvas Panel (right):**
+  - Dot-grid background (`--surface3` dots, 24px spacing)
+  - 4000x4000px virtual canvas, scrollable
+  - Artifact cards positioned absolutely
 
-### 3. Canvas Screen (1440x900)
-- **Header (48px):** "<- Chat" button, room code, users, "+ New Idea" button
-- **Canvas Area:** dot-grid background (24px spacing), artifact cards floating
-- **Sidebar (280px):** mini-chat with compact messages
+### 3. Visualization Picker Modal (560px)
+Overlay modal with:
+- Title: "Choose Visualizations" with subtitle
+- 4-column grid of agent cards (icon + name, checkbox, selected state with purple border)
+- Pre-selected suggestions marked "recommended"
+- Reference chips section (existing artifacts to use as context)
+- Custom viz checkbox + text input
+- Footer: Cancel + "Generate (N)" primary button
 
-### 4. New Idea Modal
-Overlay with centered 460px card. Agent grid (2 columns), text input for custom prompt, Cancel/Generate buttons.
+### 4. Artifact Cards
+Floating cards (300-500px wide) with:
+- **Action bar** (hover, above card): Expand / Transform / Ask buttons
+- **Header:** agent icon + title + "by Author" label
+- **Body:** rendered content (SVG, HTML, charts)
+- **Ask bar** (toggle): mini input + Ask button at card bottom
+- **Transform dropdown:** list of all other agent types
+- **States:** default, hover (purple border glow), dragging (opacity 0.9, z-index 100), updating (spinner overlay)
 
-### 5. Artifact Cards
-Floating cards (300-500px wide) with header (icon + title + author) and body containing rendered content (mind map SVG, table, slides, diagram, guide iframe, image placeholder).
+### 5. Mobile: Chat View (375x812)
+- Room code badge (top-left)
+- Full-width chat messages
+- Input bar with Send button
+- Bottom tab bar: "Chat" (active, `--accent2`) | "Canvas"
+
+### 6. Mobile: Canvas View (375x812)
+- Full-width canvas with artifact cards (stacked vertically)
+- Bottom tab bar: "Chat" | "Canvas" (active, `--accent2`)
 
 ---
 
-## Agent Icons Reference
+## Agent Icons Reference (15 agents)
 
-| Agent             | Icon | Description                        |
-|-------------------|------|------------------------------------|
-| Mind Map          | `🧠`  | Visual map of ideas                |
-| Table             | `📊`  | Comparison/analysis table          |
-| Slides            | `📽️`  | Mini presentation                  |
-| Diagram           | `📐`  | Flowchart/sequence diagram         |
-| Guide             | `📖`  | HTML documentation                 |
-| Image             | `🎨`  | Image generation (placeholder)     |
-| Free Interpret    | `✨`  | Auto-pick best format              |
+| Agent             | ID             | Icon | Description                        |
+|-------------------|----------------|------|------------------------------------|
+| Mind Map          | `mindmap`      | `🧠`  | Visual map of ideas and connections |
+| Table             | `table`        | `📊`  | Comparison/analysis table          |
+| Presentation      | `presentation` | `🎬`  | Pitching ideas, narratives         |
+| Diagram           | `diagram`      | `🔀`  | Process flows, architecture        |
+| HTML Guide        | `html_guide`   | `📖`  | Tutorials, documentation           |
+| Image             | `image`        | `🎨`  | Visual illustrations (placeholder) |
+| Freeform          | `freeform`     | `✨`  | Creative HTML, custom widgets      |
+| Timeline          | `timeline`     | `📅`  | Roadmaps, milestones               |
+| SWOT Analysis     | `swot`         | `⚡`  | Strategic analysis                 |
+| Kanban Board      | `kanban`       | `📋`  | Task organization                  |
+| Pros & Cons       | `pros_cons`    | `⚖️`  | Tradeoff analysis                  |
+| Priority Matrix   | `matrix`       | `🎯`  | Effort/impact prioritization       |
+| Checklist         | `checklist`    | `✅`  | Action items, task lists           |
+| Donut Chart       | `donut_chart`  | `🍩`  | Proportions, distribution          |
+| Insight Card      | `quote_card`   | `💡`  | Key takeaways                      |
