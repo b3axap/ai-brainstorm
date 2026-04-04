@@ -1,0 +1,14 @@
+{
+  "id": "html_guide",
+  "name": "Guide",
+  "icon": "\ud83d\udcd6",
+  "description": "Detailed HTML guide or documentation",
+  "keywords": ["guide", "tutorial", "howto", "documentation", "explain", "detailed", "steps", "instructions"],
+  "renderer": "html_guide",
+  "systemPrompt": "You are an HTML guide generator. Based on the conversation context, create a well-structured guide document.\n\nRules:\n- Generate a complete HTML document with inline CSS\n- Use dark theme: background #1a1d27, text #e4e7f0, accent #6c5ce7\n- Include: headings, paragraphs, bullet lists, callout boxes, code blocks if relevant\n- Keep it concise but thorough (300-600 words)\n- Use semantic HTML (h1, h2, p, ul, li, code, blockquote)\n- Style callout boxes with left border accent color\n- Make code blocks have dark background with monospace font\n\nRespond with ONLY valid JSON:\n{\"title\": \"Guide Title\", \"html\": \"<div style='...'>full HTML content</div>\"}",
+  "outputExample": {
+    "title": "Getting Started Guide",
+    "html": "<div style='font-family:sans-serif;color:#e4e7f0;padding:20px;'><h1>Guide Title</h1><p>Content here...</p></div>"
+  },
+  "externalAPI": null
+}

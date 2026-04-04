@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Brainstorm</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SCREEN 1: LANDING -->
+<div id="landing" class="screen active">
+  <div class="landing-card">
+    <h1>🧠 <span>Brainstorm</span></h1>
+    <p class="subtitle">Collaborative AI-powered idea visualization</p>
+
+    <div class="input-group">
+      <label>Your name</label>
+      <input class="input" id="nameInput" type="text" placeholder="Enter your name..." maxlength="20" autofocus>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="createBtn">Create New Room</button>
+
+    <div class="divider">or join existing</div>
+
+    <div class="join-row">
+      <input class="input" id="codeInput" type="text" placeholder="ROOM CODE" maxlength="6">
+      <button class="btn" id="joinBtn">Join</button>
+    </div>
+
+    <div class="error-msg" id="landingError"></div>
+  </div>
+</div>
+
+<!-- SCREEN 2: CHAT -->
+<div id="chat" class="screen">
+  <div class="chat-header">
+    <span class="room-code" id="chatRoomCode" title="Click to copy">---</span>
+    <span class="users-list" id="chatUsers"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="goCanvasBtn">Canvas →</button>
+  </div>
+
+  <div class="chat-messages" id="chatMessages">
+    <div class="message assistant">
+      <div class="msg-header"><span class="name">Claude</span></div>
+      <div class="msg-bubble">Welcome! Describe your idea and I'll help you brainstorm and visualize it. 🧠</div>
+    </div>
+  </div>
+
+  <div class="typing-indicator" id="typingIndicator">✨ Claude is thinking...</div>
+
+  <div class="chat-input">
+    <input class="input" id="chatInput" type="text" placeholder="Describe your idea..." autocomplete="off">
+    <button class="btn btn-primary" id="chatSendBtn">Send</button>
+  </div>
+</div>
+
+<!-- SCREEN 3: CANVAS -->
+<div id="canvas" class="screen">
+  <div class="canvas-header">
+    <button class="btn" id="goChatBtn">← Chat</button>
+    <span class="room-code" id="canvasRoomCode">---</span>
+    <span class="users-list" id="canvasUsers"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="newIdeaBtn">+ New Idea</button>
+  </div>
+
+  <div class="canvas-body">
+    <div class="canvas-area" id="canvasArea">
+      <div class="canvas-grid"></div>
+      <div class="canvas-content" id="canvasContent">
+        <!-- Artifact cards rendered here -->
+      </div>
+    </div>
+
+    <div class="canvas-sidebar">
+      <div class="sidebar-header">💬 Chat</div>
+      <div class="sidebar-messages" id="sidebarMessages"></div>
+      <div class="sidebar-input">
+        <input class="input" id="sidebarInput" type="text" placeholder="Message..." autocomplete="off">
+        <button class="btn" id="sidebarSendBtn">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW IDEA MODAL -->
+<div class="modal-overlay" id="newIdeaModal">
+  <div class="modal">
+    <h2>✨ Generate New Visualization</h2>
+    <div class="input-group">
+      <label>Your idea (optional — uses chat context if empty)</label>
+      <input class="input" id="newIdeaInput" type="text" placeholder="Additional context for this visualization...">
+    </div>
+    <div class="input-group">
+      <label>Choose visualization type</label>
+      <div class="agent-grid" id="agentGrid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" id="modalCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="renderers.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Brainstorm Studio</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --surface3: #2a2f3d;
+    --border: #2e3345;
+    --text: #e4e7f0;
+    --text2: #8b90a0;
+    --accent: #6c5ce7;
+    --accent2: #a29bfe;
+    --green: #00cec9;
+    --orange: #fdcb6e;
+    --pink: #fd79a8;
+    --red: #ff6b6b;
+    --blue: #74b9ff;
+    --radius: 10px;
+    --shadow: 0 4px 24px rgba(0,0,0,.4);
+  }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* TOP BAR */
+  .topbar { height: 52px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 12px; z-index: 100; flex-shrink: 0; }
+  .topbar .logo { font-weight: 700; font-size: 15px; color: var(--accent2); display: flex; align-items: center; gap: 6px; }
+  .topbar .logo svg { width: 20px; height: 20px; }
+  .topbar .breadcrumb { color: var(--text2); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .topbar .breadcrumb span { cursor: pointer; }
+  .topbar .breadcrumb span:hover { color: var(--text); }
+  .topbar .breadcrumb .sep { opacity: .4; }
+  .topbar .session-title { font-weight: 600; font-size: 14px; cursor: pointer; }
+  .topbar .session-title:hover { color: var(--accent2); }
+  .topbar .spacer { flex: 1; }
+  .avatars { display: flex; gap: -8px; align-items: center; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--surface); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; margin-left: -6px; cursor: pointer; position: relative; }
+  .avatar:first-child { margin-left: 0; }
+  .avatar.you { background: var(--accent); }
+  .avatar.a2 { background: var(--green); color: #000; }
+  .avatar.a3 { background: var(--orange); color: #000; }
+  .online-dot { width: 8px; height: 8px; background: #00b894; border-radius: 50%; border: 2px solid var(--surface); position: absolute; bottom: -1px; right: -1px; }
+  .btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all .15s; }
+  .btn:hover { background: var(--surface3); border-color: var(--accent); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); }
+  .btn-primary:hover { background: #7c6ef0; }
+
+  /* MAIN LAYOUT */
+  .main { flex: 1; display: flex; overflow: hidden; }
+
+  /* LEFT RAIL */
+  .left-rail { width: 240px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s; overflow: hidden; }
+  .left-rail.collapsed { width: 48px; }
+  .left-rail.collapsed .rail-content { opacity: 0; pointer-events: none; }
+  .left-rail.collapsed .rail-toggle svg { transform: rotate(180deg); }
+  .rail-header { padding: 12px; display: flex; align-items: center; justify-content: space-between; }
+  .rail-header h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); }
+  .rail-toggle { background: none; border: none; color: var(--text2); cursor: pointer; padding: 4px; border-radius: 4px; }
+  .rail-toggle:hover { background: var(--surface2); color: var(--text); }
+  .rail-toggle svg { width: 16px; height: 16px; transition: transform .2s; }
+  .rail-content { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+  .rail-section { margin-bottom: 16px; }
+  .rail-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--text2); padding: 4px 8px; margin-bottom: 4px; }
+  .rail-item { padding: 7px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background .1s; position: relative; }
+  .rail-item:hover { background: var(--surface2); }
+  .rail-item.active { background: var(--surface3); color: var(--accent2); }
+  .rail-item .icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+  .rail-item .presence { width: 6px; height: 6px; border-radius: 50%; background: #00b894; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+  .rail-item .count { font-size: 10px; color: var(--text2); margin-left: auto; }
+  .new-session-btn { margin: 8px; padding: 8px; border-radius: 6px; border: 1px dashed var(--border); color: var(--text2); font-size: 12px; cursor: pointer; text-align: center; transition: all .15s; }
+  .new-session-btn:hover { border-color: var(--accent); color: var(--accent2); background: rgba(108,92,231,.1); }
+
+  /* CANVAS */
+  .canvas-area { flex: 1; position: relative; overflow: hidden; background: var(--bg); }
+  .canvas-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, #2a2f3d 1px, transparent 1px); background-size: 24px 24px; }
+  .canvas-content { position: absolute; inset: 0; padding: 40px; }
+
+  /* ARTIFACT CARDS */
+  .artifact { position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); cursor: grab; transition: box-shadow .2s, border-color .2s; min-width: 280px; user-select: none; }
+  .artifact:hover { border-color: rgba(108,92,231,.4); box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+  .artifact.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,92,231,.3), 0 8px 32px rgba(0,0,0,.5); }
+  .artifact-header { padding: 10px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+  .artifact-type { font-size: 14px; }
+  .artifact-title { font-size: 13px; font-weight: 600; flex: 1; }
+  .artifact-version { font-size: 10px; color: var(--text2); background: var(--surface3); padding: 2px 6px; border-radius: 4px; }
+  .artifact-meta { padding: 4px 14px; font-size: 10px; color: var(--text2); display: flex; align-items: center; gap: 4px; }
+  .artifact-body { padding: 14px; min-height: 120px; }
+  .artifact-actions { padding: 8px 14px; border-top: 1px solid var(--border); display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+  .artifact:hover .artifact-actions { opacity: 1; }
+  .artifact-action { padding: 4px 10px; border-radius: 5px; font-size: 11px; color: var(--text2); cursor: pointer; border: none; background: none; transition: all .1s; display: flex; align-items: center; gap: 4px; }
+  .artifact-action:hover { background: var(--surface3); color: var(--text); }
+  .artifact-action .badge { background: var(--surface3); padding: 1px 5px; border-radius: 3px; font-size: 10px; }
+
+  /* MINDMAP inside artifact */
+  .mindmap { display: flex; align-items: center; justify-content: center; min-height: 160px; position: relative; }
+  .mindmap-node { padding: 6px 12px; border-radius: 20px; font-size: 11px; white-space: nowrap; position: absolute; cursor: pointer; transition: transform .15s; }
+  .mindmap-node:hover { transform: scale(1.08); }
+  .mindmap-node.center { background: var(--accent); font-weight: 600; font-size: 12px; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 1; }
+  .mindmap-node.n1 { background: rgba(108,92,231,.3); left: 15%; top: 20%; }
+  .mindmap-node.n2 { background: rgba(0,206,201,.3); left: 72%; top: 15%; }
+  .mindmap-node.n3 { background: rgba(253,203,110,.3); color: #000; left: 10%; top: 72%; }
+  .mindmap-node.n4 { background: rgba(253,121,168,.3); left: 70%; top: 70%; }
+  .mindmap-node.n5 { background: rgba(116,185,255,.3); left: 78%; top: 45%; }
+  .mindmap-line { position: absolute; background: var(--border); height: 1px; transform-origin: left center; }
+
+  /* TABLE inside artifact */
+  .mini-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .mini-table th { text-align: left; padding: 6px 8px; color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+  .mini-table td { padding: 6px 8px; border-bottom: 1px solid rgba(46,51,69,.5); }
+  .mini-table tr:hover td { background: rgba(108,92,231,.05); }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+  .tag-green { background: rgba(0,206,201,.2); color: var(--green); }
+  .tag-orange { background: rgba(253,203,110,.2); color: var(--orange); }
+  .tag-pink { background: rgba(253,121,168,.2); color: var(--pink); }
+
+  /* RELATIONSHIP LINES (SVG overlay) */
+  .canvas-svg { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+
+  /* COLLABORATOR CURSOR */
+  .collab-cursor { position: absolute; z-index: 50; pointer-events: none; transition: all .3s ease; }
+  .collab-cursor .cursor-arrow { font-size: 18px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+  .collab-cursor .cursor-name { font-size: 10px; padding: 2px 6px; border-radius: 4px; white-space: nowrap; margin-left: 12px; margin-top: -4px; font-weight: 500; }
+
+  /* RIGHT PANEL */
+  .right-panel { width: 360px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s; }
+  .right-panel.collapsed { width: 0; border: none; }
+  .panel-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .panel-tab { flex: 1; padding: 10px 8px; font-size: 11px; text-align: center; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; transition: all .15s; }
+  .panel-tab:hover { color: var(--text); background: var(--surface2); }
+  .panel-tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+  .panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+
+  /* AI PARTNER TAB */
+  .ai-section { margin-bottom: 20px; }
+  .ai-section label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 8px; }
+  .ai-textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 10px 12px; font-size: 13px; resize: vertical; min-height: 80px; font-family: inherit; outline: none; transition: border-color .15s; }
+  .ai-textarea:focus { border-color: var(--accent); }
+  .ai-textarea::placeholder { color: var(--text2); opacity: .6; }
+  .output-types { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .output-type { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); font-size: 11px; cursor: pointer; text-align: center; transition: all .15s; display: flex; align-items: center; gap: 6px; justify-content: center; }
+  .output-type:hover { border-color: var(--accent); background: rgba(108,92,231,.1); }
+  .output-type.selected { border-color: var(--accent); background: rgba(108,92,231,.15); color: var(--accent2); }
+  .output-type .ot-icon { font-size: 14px; }
+  .generate-btn { width: 100%; padding: 10px; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--accent), #7c6ef0); color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .generate-btn:hover { opacity: .9; transform: translateY(-1px); }
+  .generate-btn:active { transform: translateY(0); }
+
+  /* THREAD TAB */
+  .comment { margin-bottom: 14px; }
+  .comment-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .comment-avatar { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; }
+  .comment-name { font-size: 12px; font-weight: 600; }
+  .comment-time { font-size: 10px; color: var(--text2); }
+  .comment-body { font-size: 12px; line-height: 1.5; color: var(--text); padding-left: 30px; }
+  .comment-actions { padding-left: 30px; margin-top: 4px; display: flex; gap: 8px; }
+  .comment-action-btn { font-size: 10px; color: var(--text2); cursor: pointer; background: none; border: none; }
+  .comment-action-btn:hover { color: var(--accent2); }
+  .comment-input { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .comment-input input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12px; color: var(--text); outline: none; }
+  .comment-input input:focus { border-color: var(--accent); }
+  .comment-input button { padding: 8px 12px; border-radius: 6px; border: none; background: var(--accent); color: white; font-size: 12px; cursor: pointer; }
+
+  /* REACTIONS */
+  .reactions { display: flex; gap: 4px; padding: 4px 14px 8px; }
+  .reaction { padding: 2px 8px; border-radius: 12px; border: 1px solid var(--border); font-size: 12px; cursor: pointer; background: var(--surface2); transition: all .1s; display: flex; align-items: center; gap: 3px; }
+  .reaction:hover { border-color: var(--accent); }
+  .reaction.active { border-color: var(--accent); background: rgba(108,92,231,.15); }
+  .reaction .count { font-size: 10px; color: var(--text2); }
+
+  /* QUICK DOCK */
+  .quick-dock { height: 56px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0; }
+  .quick-input-wrap { flex: 1; position: relative; }
+  .quick-input { width: 100%; padding: 10px 14px 10px 36px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; transition: border-color .15s; }
+  .quick-input:focus { border-color: var(--accent); }
+  .quick-input::placeholder { color: var(--text2); opacity: .5; }
+  .quick-input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--text2); }
+  .quick-hint { font-size: 10px; color: var(--text2); white-space: nowrap; }
+  .kbd { padding: 2px 5px; border-radius: 3px; background: var(--surface3); border: 1px solid var(--border); font-size: 10px; font-family: monospace; }
+
+  /* GENERATION PROGRESS OVERLAY */
+  .gen-overlay { position: absolute; inset: 0; background: rgba(15,17,23,.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s; }
+  .gen-overlay.active { opacity: 1; pointer-events: auto; }
+  .gen-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px 40px; text-align: center; box-shadow: var(--shadow); }
+  .gen-spinner { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gen-status { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+  .gen-sub { font-size: 12px; color: var(--text2); }
+  .gen-cancel { margin-top: 16px; padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text2); font-size: 11px; cursor: pointer; }
+  .gen-cancel:hover { border-color: var(--red); color: var(--red); }
+
+  /* FORK BADGE */
+  .fork-badge { position: absolute; top: -10px; right: -10px; background: var(--orange); color: #000; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(2px); z-index: 500; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .modal-overlay.active { opacity: 1; pointer-events: auto; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 420px; max-width: 90vw; box-shadow: var(--shadow); }
+  .modal h2 { font-size: 16px; margin-bottom: 16px; }
+  .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text2); font-size: 18px; cursor: pointer; }
+
+  /* NEW SESSION MODAL */
+  .ns-input { width: 100%; padding: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; margin-bottom: 12px; outline: none; font-family: inherit; }
+  .ns-input:focus { border-color: var(--accent); }
+  .ns-templates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .ns-template { padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; text-align: center; transition: all .15s; }
+  .ns-template:hover { border-color: var(--accent); }
+  .ns-template .ns-emoji { font-size: 20px; margin-bottom: 4px; }
+  .ns-template .ns-label { font-size: 11px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 20px; font-size: 13px; z-index: 600; transition: transform .3s, opacity .3s; opacity: 0; pointer-events: none; box-shadow: var(--shadow); }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* slide renderer mini */
+  .slide-deck { position: relative; }
+  .slide-content { background: var(--surface2); border-radius: 6px; padding: 16px; min-height: 100px; text-align: center; margin-bottom: 8px; }
+  .slide-content h3 { font-size: 14px; margin-bottom: 6px; }
+  .slide-content p { font-size: 11px; color: var(--text2); }
+  .slide-nav { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .slide-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); cursor: pointer; }
+  .slide-dot.active { background: var(--accent); }
+  .slide-arrow { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 16px; }
+  .slide-arrow:hover { color: var(--text); }
+  .slide-counter { font-size: 10px; color: var(--text2); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    Brainstorm
+  </div>
+  <div class="breadcrumb">
+    <span>Product Team</span>
+    <span class="sep">/</span>
+    <span>Q2 Ideas</span>
+    <span class="sep">/</span>
+  </div>
+  <span class="session-title" onclick="showToast('Rename session')">AI Assistant Redesign</span>
+  <div class="spacer"></div>
+  <div class="avatars">
+    <div class="avatar you" title="You">ZK<div class="online-dot"></div></div>
+    <div class="avatar a2" title="Anna">AN<div class="online-dot"></div></div>
+    <div class="avatar a3" title="Max">MX</div>
+  </div>
+  <button class="btn" onclick="showToast('Share link copied!')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+    Share
+  </button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT RAIL -->
+  <div class="left-rail" id="leftRail">
+    <div class="rail-header">
+      <h3>Sessions</h3>
+      <button class="rail-toggle" onclick="toggleRail()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+    <div class="rail-content">
+      <div class="rail-section">
+        <div class="rail-section-title">Recent</div>
+        <div class="rail-item active">
+          <span class="icon">💡</span> AI Assistant Redesign
+          <div class="presence"></div>
+        </div>
+        <div class="rail-item" onclick="showToast('Switched to session')">
+          <span class="icon">🚀</span> Launch Strategy
+          <span class="count">12</span>
+        </div>
+        <div class="rail-item" onclick="showToast('Switched to session')">
+          <span class="icon">📊</span> Metrics Dashboard
+          <span class="count">8</span>
+        </div>
+      </div>
+      <div class="rail-section">
+        <div class="rail-section-title">Q2 Ideas</div>
+        <div class="rail-item" onclick="showToast('Switched to session')">
+          <span class="icon">🎨</span> Brand Refresh
+          <span class="count">5</span>
+        </div>
+        <div class="rail-item" onclick="showToast('Switched to session')">
+          <span class="icon">🔧</span> API v3 Design
+          <span class="count">15</span>
+          <div class="presence"></div>
+        </div>
+        <div class="rail-item" onclick="showToast('Switched to session')">
+          <span class="icon">📱</span> Mobile App MVP
+          <span class="count">3</span>
+        </div>
+      </div>
+      <div class="new-session-btn" onclick="openModal('newSession')">+ New Session</div>
+      <div class="rail-section">
+        <div class="rail-section-title">Favorites</div>
+        <div class="rail-item" onclick="showToast('Switched to session')">
+          <span class="icon">⭐</span> Product Roadmap
+          <span class="count">23</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area" id="canvasArea">
+    <div class="canvas-grid"></div>
+
+    <!-- SVG for relationship lines -->
+    <svg class="canvas-svg" id="canvasSvg">
+      <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#4a4f66"/>
+        </marker>
+      </defs>
+      <!-- Lines drawn by JS -->
+    </svg>
+
+    <!-- ARTIFACT 1: Mind Map -->
+    <div class="artifact selected" id="art1" style="left: 60px; top: 30px; width: 380px;" onclick="selectArtifact(this)">
+      <div class="artifact-header">
+        <span class="artifact-type">🧠</span>
+        <span class="artifact-title">AI Assistant: Core Concepts</span>
+        <span class="artifact-version">v2</span>
+      </div>
+      <div class="artifact-meta">
+        <span>@ZK created</span> · <span>5 min ago</span> · <span style="color:var(--accent2)">✨ AI generated</span>
+      </div>
+      <div class="artifact-body">
+        <div class="mindmap" style="height: 170px;">
+          <div class="mindmap-node center">AI Assistant</div>
+          <div class="mindmap-node n1" onclick="showToast('Drill down: NLP')">NLP Engine</div>
+          <div class="mindmap-node n2" onclick="showToast('Drill down: UX')">UX Patterns</div>
+          <div class="mindmap-node n3" onclick="showToast('Drill down: Context')">Context Memory</div>
+          <div class="mindmap-node n4" onclick="showToast('Drill down: Multi-modal')">Multi-modal</div>
+          <div class="mindmap-node n5" onclick="showToast('Drill down: API')">API Layer</div>
+        </div>
+      </div>
+      <div class="reactions">
+        <span class="reaction active" onclick="toggleReaction(this)">💡 <span class="count">3</span></span>
+        <span class="reaction" onclick="toggleReaction(this)">🔥 <span class="count">1</span></span>
+        <span class="reaction" onclick="toggleReaction(this)">❓ <span class="count">0</span></span>
+      </div>
+      <div class="artifact-actions">
+        <button class="artifact-action" onclick="showGenerating()">✨ Refine</button>
+        <button class="artifact-action" onclick="forkArtifact()">🔀 Fork</button>
+        <button class="artifact-action" onclick="showToast('Transform menu')">🔄 Transform</button>
+        <button class="artifact-action" onclick="switchTab('thread')">💬 <span class="badge">3</span></button>
+      </div>
+    </div>
+
+    <!-- ARTIFACT 2: Comparison Table -->
+    <div class="artifact" id="art2" style="left: 500px; top: 20px; width: 370px;" onclick="selectArtifact(this)">
+      <div class="artifact-header">
+        <span class="artifact-type">📊</span>
+        <span class="artifact-title">Framework Comparison</span>
+        <span class="artifact-version">v1</span>
+      </div>
+      <div class="artifact-meta">
+        <span>@AN created</span> · <span>3 min ago</span>
+      </div>
+      <div class="artifact-body" style="padding: 8px;">
+        <table class="mini-table">
+          <thead><tr><th>Criteria</th><th>Option A</th><th>Option B</th><th>Option C</th></tr></thead>
+          <tbody>
+            <tr><td>Speed</td><td><span class="tag tag-green">Fast</span></td><td><span class="tag tag-orange">Medium</span></td><td><span class="tag tag-green">Fast</span></td></tr>
+            <tr><td>Cost</td><td>$12k</td><td>$8k</td><td>$15k</td></tr>
+            <tr><td>Risk</td><td><span class="tag tag-orange">Medium</span></td><td><span class="tag tag-green">Low</span></td><td><span class="tag tag-pink">High</span></td></tr>
+            <tr><td>Team fit</td><td>85%</td><td>72%</td><td>91%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="reactions">
+        <span class="reaction" onclick="toggleReaction(this)">👍 <span class="count">2</span></span>
+        <span class="reaction active" onclick="toggleReaction(this)">🤔 <span class="count">1</span></span>
+      </div>
+      <div class="artifact-actions">
+        <button class="artifact-action" onclick="showGenerating()">✨ Refine</button>
+        <button class="artifact-action" onclick="forkArtifact()">🔀 Fork</button>
+        <button class="artifact-action" onclick="showToast('AI filling empty cells...')">🤖 AI Fill</button>
+        <button class="artifact-action" onclick="switchTab('thread')">💬 <span class="badge">1</span></button>
+      </div>
+    </div>
+
+    <!-- ARTIFACT 3: Mini Presentation -->
+    <div class="artifact" id="art3" style="left: 180px; top: 340px; width: 340px;" onclick="selectArtifact(this)">
+      <div class="artifact-header">
+        <span class="artifact-type">📽️</span>
+        <span class="artifact-title">Pitch Deck Draft</span>
+        <span class="artifact-version">v1</span>
+      </div>
+      <div class="artifact-meta">
+        <span>@ZK created</span> · <span>1 min ago</span> · <span style="color:var(--accent2)">✨ AI</span>
+      </div>
+      <div class="artifact-body">
+        <div class="slide-deck">
+          <div class="slide-content" id="slideContent">
+            <h3 id="slideTitle">The Problem</h3>
+            <p id="slideText">Current AI assistants lack contextual understanding and collaborative features</p>
+          </div>
+          <div class="slide-nav">
+            <button class="slide-arrow" onclick="changeSlide(-1)">‹</button>
+            <span class="slide-dot active" onclick="goToSlide(0)"></span>
+            <span class="slide-dot" onclick="goToSlide(1)"></span>
+            <span class="slide-dot" onclick="goToSlide(2)"></span>
+            <span class="slide-dot" onclick="goToSlide(3)"></span>
+            <button class="slide-arrow" onclick="changeSlide(1)">›</button>
+            <span class="slide-counter" id="slideCounter">1 / 4</span>
+          </div>
+        </div>
+      </div>
+      <div class="artifact-actions">
+        <button class="artifact-action" onclick="showToast('Fullscreen mode')">⛶ Present</button>
+        <button class="artifact-action" onclick="showGenerating()">✨ Refine</button>
+        <button class="artifact-action" onclick="forkArtifact()">🔀 Fork</button>
+        <button class="artifact-action" onclick="switchTab('thread')">💬 <span class="badge">0</span></button>
+      </div>
+    </div>
+
+    <!-- ARTIFACT 4: Fork of art1 -->
+    <div class="artifact" id="art4" style="left: 560px; top: 340px; width: 310px;" onclick="selectArtifact(this)">
+      <div class="fork-badge">FORK by @AN</div>
+      <div class="artifact-header">
+        <span class="artifact-type">🧠</span>
+        <span class="artifact-title">AI Assistant: Alternative</span>
+        <span class="artifact-version">v1</span>
+      </div>
+      <div class="artifact-meta">
+        <span>@AN forked from Core Concepts</span> · <span>just now</span>
+      </div>
+      <div class="artifact-body">
+        <div class="mindmap" style="height: 130px;">
+          <div class="mindmap-node center">AI Agent</div>
+          <div class="mindmap-node n1">Tool Use</div>
+          <div class="mindmap-node n2" style="left:68%;top:20%">Autonomy</div>
+          <div class="mindmap-node n3">Planning</div>
+          <div class="mindmap-node n4" style="left:65%;top:68%">Safety</div>
+        </div>
+      </div>
+      <div class="reactions">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn" style="font-size:11px; padding:4px 12px;" onclick="showToast('You voted for this fork!')">👍 Vote (1)</button>
+          <button class="btn" style="font-size:11px; padding:4px 12px;" onclick="showToast('Merge proposal sent')">🔀 Merge</button>
+        </div>
+      </div>
+      <div class="artifact-actions">
+        <button class="artifact-action" onclick="showGenerating()">✨ Refine</button>
+        <button class="artifact-action" onclick="switchTab('thread')">💬 <span class="badge">2</span></button>
+      </div>
+    </div>
+
+    <!-- Collaborator cursor -->
+    <div class="collab-cursor" id="collabCursor" style="left: 420px; top: 280px;">
+      <div class="cursor-arrow" style="color: var(--green);">▲</div>
+      <div class="cursor-name" style="background: var(--green); color: #000;">Anna</div>
+    </div>
+
+    <!-- Generation overlay -->
+    <div class="gen-overlay" id="genOverlay">
+      <div class="gen-card">
+        <div class="gen-spinner"></div>
+        <div class="gen-status">Generating mind map...</div>
+        <div class="gen-sub" id="genSubtext">Analyzing structure and building relationships</div>
+        <button class="gen-cancel" onclick="hideGenerating()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel" id="rightPanel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" data-tab="ai" onclick="switchTab('ai')">✨ AI Partner</div>
+      <div class="panel-tab" data-tab="thread" onclick="switchTab('thread')">💬 Thread</div>
+      <div class="panel-tab" data-tab="props" onclick="switchTab('props')">📋 Props</div>
+      <div class="panel-tab" data-tab="history" onclick="switchTab('history')">🕐 History</div>
+    </div>
+
+    <!-- AI PARTNER TAB -->
+    <div class="panel-body" id="tabAi">
+      <div class="ai-section">
+        <label>Your Idea</label>
+        <textarea class="ai-textarea" placeholder="Describe your idea, question, or what you want to explore..." rows="4">Redesign the AI assistant to be more collaborative and context-aware</textarea>
+      </div>
+      <div class="ai-section">
+        <label>Output Type</label>
+        <div class="output-types">
+          <div class="output-type selected" onclick="selectOutputType(this)"><span class="ot-icon">🧠</span> Mind Map</div>
+          <div class="output-type" onclick="selectOutputType(this)"><span class="ot-icon">📊</span> Table</div>
+          <div class="output-type" onclick="selectOutputType(this)"><span class="ot-icon">📽️</span> Slides</div>
+          <div class="output-type" onclick="selectOutputType(this)"><span class="ot-icon">📄</span> Guide</div>
+          <div class="output-type" onclick="selectOutputType(this)"><span class="ot-icon">🎬</span> Animation</div>
+          <div class="output-type" onclick="selectOutputType(this)"><span class="ot-icon">📐</span> Diagram</div>
+          <div class="output-type" onclick="selectOutputType(this)"><span class="ot-icon">⚖️</span> Compare</div>
+          <div class="output-type" onclick="selectOutputType(this)"><span class="ot-icon">🌐</span> HTML</div>
+        </div>
+      </div>
+      <div class="ai-section">
+        <label>Build on existing</label>
+        <div style="padding:8px 12px; border-radius:6px; border:1px dashed var(--border); color:var(--text2); font-size:12px; cursor:pointer; text-align:center;" onclick="showToast('Select an artifact on canvas to link')">
+          + Link artifact as context
+        </div>
+      </div>
+      <div class="ai-section" style="display:flex;gap:12px;">
+        <div style="flex:1">
+          <label>Depth</label>
+          <input type="range" min="1" max="3" value="2" style="width:100%;accent-color:var(--accent);">
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text2)"><span>Overview</span><span>Deep dive</span></div>
+        </div>
+        <div style="flex:1">
+          <label>Tone</label>
+          <input type="range" min="1" max="3" value="2" style="width:100%;accent-color:var(--accent);">
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text2)"><span>Formal</span><span>Playful</span></div>
+        </div>
+      </div>
+      <button class="generate-btn" onclick="showGenerating()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Generate
+      </button>
+      <div style="text-align:center;margin-top:8px;font-size:10px;color:var(--text2)">
+        <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> to generate
+      </div>
+    </div>
+
+    <!-- THREAD TAB -->
+    <div class="panel-body" id="tabThread" style="display:none">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Comments on: <strong style="color:var(--text)">AI Assistant: Core Concepts</strong></div>
+
+      <div class="comment">
+        <div class="comment-header">
+          <div class="comment-avatar" style="background:var(--green);color:#000;">AN</div>
+          <span class="comment-name">Anna</span>
+          <span class="comment-time">3 min ago</span>
+        </div>
+        <div class="comment-body">I think we should add "Tool Use" as a separate branch. It's becoming a key differentiator for AI assistants.</div>
+        <div class="comment-actions">
+          <button class="comment-action-btn">Reply</button>
+          <button class="comment-action-btn">👍 2</button>
+        </div>
+      </div>
+
+      <div class="comment">
+        <div class="comment-header">
+          <div class="comment-avatar" style="background:var(--accent);">ZK</div>
+          <span class="comment-name">Zakhar</span>
+          <span class="comment-time">2 min ago</span>
+        </div>
+        <div class="comment-body">Good point! Maybe we can merge "NLP Engine" and "Multi-modal" into a single "Understanding" branch?</div>
+        <div class="comment-actions">
+          <button class="comment-action-btn">Reply</button>
+          <button class="comment-action-btn">👍 1</button>
+        </div>
+      </div>
+
+      <div class="comment">
+        <div class="comment-header">
+          <div class="comment-avatar" style="background:var(--orange);color:#000;">MX</div>
+          <span class="comment-name">Max</span>
+          <span class="comment-time">1 min ago</span>
+        </div>
+        <div class="comment-body">I created a fork with an alternative structure focused on agentic capabilities. Check it out!</div>
+        <div class="comment-actions">
+          <button class="comment-action-btn">Reply</button>
+          <button class="comment-action-btn">👍 3</button>
+        </div>
+      </div>
+
+      <div class="comment-input">
+        <input type="text" placeholder="Add a comment..." id="commentInput" onkeypress="if(event.key==='Enter')addComment()">
+        <button onclick="addComment()">Send</button>
+      </div>
+    </div>
+
+    <!-- PROPERTIES TAB -->
+    <div class="panel-body" id="tabProps" style="display:none">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Properties: <strong style="color:var(--text)">AI Assistant: Core Concepts</strong></div>
+      <div style="display:grid;gap:12px;">
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px;">TYPE</div><div style="font-size:13px;">🧠 Mind Map</div></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px;">CREATED BY</div><div style="font-size:13px;">@ZK (Zakhar)</div></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px;">CREATED</div><div style="font-size:13px;">April 4, 2026 14:26</div></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px;">VERSION</div><div style="font-size:13px;">v2 (refined once)</div></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px;">FORKS</div><div style="font-size:13px;">1 fork by @AN</div></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px;">TAGS</div>
+          <div style="display:flex;gap:4px;margin-top:4px;">
+            <span class="tag tag-green">ai</span>
+            <span class="tag tag-orange">architecture</span>
+            <span class="tag" style="background:var(--surface3);color:var(--text2);cursor:pointer;">+ add</span>
+          </div>
+        </div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px;">GENERATION PROMPT</div>
+          <div style="font-size:12px;color:var(--text2);background:var(--surface2);padding:8px;border-radius:6px;margin-top:4px;">"Create a mind map of core concepts for a redesigned AI assistant..."</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div class="panel-body" id="tabHistory" style="display:none">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Session History</div>
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div style="display:flex;gap:10px;padding:8px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+          <div style="font-size:10px;color:var(--text2);white-space:nowrap;padding-top:2px;">just now</div>
+          <div><div style="font-size:12px;">@AN forked "Core Concepts" → "Alternative"</div><div style="font-size:10px;color:var(--text2);">New artifact created</div></div>
+        </div>
+        <div style="display:flex;gap:10px;padding:8px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+          <div style="font-size:10px;color:var(--text2);white-space:nowrap;padding-top:2px;">1 min</div>
+          <div><div style="font-size:12px;">@ZK generated "Pitch Deck Draft"</div><div style="font-size:10px;color:var(--text2);">📽️ Presentation, 4 slides</div></div>
+        </div>
+        <div style="display:flex;gap:10px;padding:8px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+          <div style="font-size:10px;color:var(--text2);white-space:nowrap;padding-top:2px;">3 min</div>
+          <div><div style="font-size:12px;">@AN generated "Framework Comparison"</div><div style="font-size:10px;color:var(--text2);">📊 Table, 4 rows</div></div>
+        </div>
+        <div style="display:flex;gap:10px;padding:8px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+          <div style="font-size:10px;color:var(--text2);white-space:nowrap;padding-top:2px;">5 min</div>
+          <div><div style="font-size:12px;">@ZK refined "Core Concepts" v1 → v2</div><div style="font-size:10px;color:var(--text2);">Added API Layer node</div></div>
+        </div>
+        <div style="display:flex;gap:10px;padding:8px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+          <div style="font-size:10px;color:var(--text2);white-space:nowrap;padding-top:2px;">8 min</div>
+          <div><div style="font-size:12px;">@ZK generated "Core Concepts" v1</div><div style="font-size:10px;color:var(--text2);">🧠 Mind Map, 5 nodes</div></div>
+        </div>
+        <div style="display:flex;gap:10px;padding:8px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+          <div style="font-size:10px;color:var(--text2);white-space:nowrap;padding-top:2px;">8 min</div>
+          <div><div style="font-size:12px;">@ZK created session</div><div style="font-size:10px;color:var(--text2);">AI Assistant Redesign</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK DOCK -->
+<div class="quick-dock">
+  <div class="quick-input-wrap">
+    <span class="quick-input-icon">✨</span>
+    <input class="quick-input" type="text" placeholder="Quick idea — type and press Enter to generate..." id="quickInput" onkeypress="if(event.key==='Enter')quickGenerate()">
+  </div>
+  <span class="quick-hint"><span class="kbd">Ctrl</span>+<span class="kbd">K</span> search &nbsp; <span class="kbd">Ctrl</span>+<span class="kbd">N</span> new session</span>
+</div>
+
+<!-- NEW SESSION MODAL -->
+<div class="modal-overlay" id="modalNewSession">
+  <div class="modal">
+    <h2>New Brainstorm Session</h2>
+    <input class="ns-input" type="text" placeholder="Session name...">
+    <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px;">Start from template</label>
+    <div class="ns-templates">
+      <div class="ns-template" onclick="closeModal();showToast('Session created!')">
+        <div class="ns-emoji">💡</div>
+        <div class="ns-label">Blank</div>
+      </div>
+      <div class="ns-template" onclick="closeModal();showToast('Session created!')">
+        <div class="ns-emoji">⚖️</div>
+        <div class="ns-label">Compare</div>
+      </div>
+      <div class="ns-template" onclick="closeModal();showToast('Session created!')">
+        <div class="ns-emoji">🗺️</div>
+        <div class="ns-label">Strategy</div>
+      </div>
+      <div class="ns-template" onclick="closeModal();showToast('Session created!')">
+        <div class="ns-emoji">🐛</div>
+        <div class="ns-label">Problem Solve</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal();showToast('Session created!')">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// Tab switching
+function switchTab(tab) {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-body').forEach(b => b.style.display = 'none');
+  const tabMap = { ai: 'tabAi', thread: 'tabThread', props: 'tabProps', history: 'tabHistory' };
+  document.querySelector(`.panel-tab[data-tab="${tab}"]`).classList.add('active');
+  document.getElementById(tabMap[tab]).style.display = 'block';
+}
+
+// Artifact selection
+function selectArtifact(el) {
+  document.querySelectorAll('.artifact').forEach(a => a.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// Output type selection
+function selectOutputType(el) {
+  document.querySelectorAll('.output-type').forEach(t => t.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// Toggle rail
+function toggleRail() {
+  document.getElementById('leftRail').classList.toggle('collapsed');
+}
+
+// Toast notifications
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// Generation overlay
+function showGenerating() {
+  document.getElementById('genOverlay').classList.add('active');
+  const subs = ['Analyzing structure...', 'Building relationships...', 'Rendering visualization...', 'Almost done...'];
+  let i = 0;
+  const iv = setInterval(() => {
+    i++;
+    if (i < subs.length) {
+      document.getElementById('genSubtext').textContent = subs[i];
+    } else {
+      clearInterval(iv);
+      hideGenerating();
+      showToast('Artifact generated!');
+    }
+  }, 1200);
+  document.getElementById('genOverlay')._interval = iv;
+}
+
+function hideGenerating() {
+  document.getElementById('genOverlay').classList.remove('active');
+  const iv = document.getElementById('genOverlay')._interval;
+  if (iv) clearInterval(iv);
+}
+
+// Fork artifact
+function forkArtifact() {
+  showToast('Fork created! New artifact appears on canvas');
+}
+
+// Toggle reaction
+function toggleReaction(el) {
+  el.classList.toggle('active');
+  const count = el.querySelector('.count');
+  const n = parseInt(count.textContent);
+  count.textContent = el.classList.contains('active') ? n + 1 : Math.max(0, n - 1);
+}
+
+// Slides
+const slides = [
+  { title: 'The Problem', text: 'Current AI assistants lack contextual understanding and collaborative features' },
+  { title: 'Our Solution', text: 'An AI-powered brainstorming studio with spatial visualization and real-time collaboration' },
+  { title: 'Key Features', text: 'Mind maps, presentations, tables, animations — generated from natural language' },
+  { title: 'Next Steps', text: 'Build MVP, test with 5 teams, iterate on feedback, launch beta in Q3' }
+];
+let currentSlide = 0;
+
+function goToSlide(n) {
+  currentSlide = n;
+  renderSlide();
+}
+function changeSlide(dir) {
+  currentSlide = Math.max(0, Math.min(slides.length - 1, currentSlide + dir));
+  renderSlide();
+}
+function renderSlide() {
+  document.getElementById('slideTitle').textContent = slides[currentSlide].title;
+  document.getElementById('slideText').textContent = slides[currentSlide].text;
+  document.getElementById('slideCounter').textContent = `${currentSlide + 1} / ${slides.length}`;
+  document.querySelectorAll('.slide-dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+}
+
+// Quick generate
+function quickGenerate() {
+  const input = document.getElementById('quickInput');
+  if (input.value.trim()) {
+    showGenerating();
+    input.value = '';
+  }
+}
+
+// Add comment
+function addComment() {
+  const input = document.getElementById('commentInput');
+  if (!input.value.trim()) return;
+  const comment = document.createElement('div');
+  comment.className = 'comment';
+  comment.innerHTML = `
+    <div class="comment-header">
+      <div class="comment-avatar" style="background:var(--accent);">ZK</div>
+      <span class="comment-name">Zakhar</span>
+      <span class="comment-time">just now</span>
+    </div>
+    <div class="comment-body">${input.value}</div>
+    <div class="comment-actions">
+      <button class="comment-action-btn">Reply</button>
+      <button class="comment-action-btn">👍 0</button>
+    </div>
+  `;
+  const container = document.getElementById('tabThread');
+  container.insertBefore(comment, container.querySelector('.comment-input'));
+  input.value = '';
+}
+
+// Modals
+function openModal(id) {
+  document.getElementById('modal' + id.charAt(0).toUpperCase() + id.slice(1)).classList.add('active');
+}
+function closeModal() {
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+}
+
+// Animate collaborator cursor
+let cursorAngle = 0;
+function animateCursor() {
+  const cursor = document.getElementById('collabCursor');
+  cursorAngle += 0.008;
+  const cx = 480 + Math.sin(cursorAngle) * 120;
+  const cy = 260 + Math.cos(cursorAngle * 0.7) * 80;
+  cursor.style.left = cx + 'px';
+  cursor.style.top = cy + 'px';
+  requestAnimationFrame(animateCursor);
+}
+animateCursor();
+
+// Draw relationship lines
+function drawLines() {
+  const svg = document.getElementById('canvasSvg');
+  const lines = [
+    { from: 'art1', to: 'art2', style: 'dotted', label: 'related' },
+    { from: 'art1', to: 'art3', style: 'solid', label: 'derived' },
+    { from: 'art1', to: 'art4', style: 'dashed', label: 'fork' },
+  ];
+
+  let html = svg.querySelector('defs').outerHTML;
+
+  lines.forEach(l => {
+    const from = document.getElementById(l.from);
+    const to = document.getElementById(l.to);
+    if (!from || !to) return;
+
+    const fx = from.offsetLeft + from.offsetWidth / 2;
+    const fy = from.offsetTop + from.offsetHeight;
+    const tx = to.offsetLeft + to.offsetWidth / 2;
+    const ty = to.offsetTop;
+
+    const dasharray = l.style === 'dashed' ? '8,4' : l.style === 'dotted' ? '3,3' : 'none';
+    const color = l.style === 'dashed' ? '#fdcb6e' : l.style === 'dotted' ? '#4a4f66' : '#6c5ce7';
+
+    html += `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="${color}" stroke-width="1.5" stroke-dasharray="${dasharray}" marker-end="url(#arrowhead)" opacity="0.5"/>`;
+
+    const mx = (fx + tx) / 2;
+    const my = (fy + ty) / 2;
+    html += `<text x="${mx}" y="${my - 6}" fill="${color}" font-size="9" text-anchor="middle" opacity="0.7">${l.label}</text>`;
+  });
+
+  svg.innerHTML = html;
+}
+drawLines();
+window.addEventListener('resize', drawLines);
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) closeModal(); });
+});
+</script>
+</body>
+</html>

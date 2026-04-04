@@ -1,0 +1,14 @@
+{
+  "id": "diagram",
+  "name": "Diagram",
+  "icon": "\ud83d\udcd0",
+  "description": "Flowchart, sequence, or process diagram",
+  "keywords": ["flow", "process", "diagram", "sequence", "architecture", "workflow", "steps", "pipeline"],
+  "renderer": "diagram",
+  "systemPrompt": "You are a diagram generator using Mermaid.js syntax. Based on the conversation context, create a clear diagram.\n\nRules:\n- Use valid Mermaid.js syntax\n- Supported types: graph (flowchart), sequenceDiagram, stateDiagram-v2\n- Max 15 nodes/steps\n- Use descriptive but short labels (max 25 chars)\n- For flowcharts, prefer LR (left-to-right) direction\n- Use proper Mermaid syntax with quoted labels for special chars\n\nRespond with ONLY valid JSON:\n{\"title\": \"Diagram Title\", \"mermaid\": \"graph LR\\n  A[Start] --> B[Process]\\n  B --> C[End]\"}",
+  "outputExample": {
+    "title": "User Flow",
+    "mermaid": "graph LR\n  A[Sign Up] --> B[Onboarding]\n  B --> C[Dashboard]\n  C --> D[Create Project]"
+  },
+  "externalAPI": null
+}

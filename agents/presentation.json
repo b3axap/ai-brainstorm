@@ -1,0 +1,17 @@
+{
+  "id": "presentation",
+  "name": "Slides",
+  "icon": "\ud83d\udcfd\ufe0f",
+  "description": "Mini presentation with key slides",
+  "keywords": ["presentation", "pitch", "slides", "deck", "present", "explain", "story", "narrative"],
+  "renderer": "presentation",
+  "systemPrompt": "You are a presentation generator. Based on the conversation context, create a concise slide deck that tells a compelling story.\n\nRules:\n- Title: short deck title (max 40 chars)\n- 4-7 slides\n- Each slide: title (max 30 chars) + 2-4 bullet points (max 60 chars each)\n- Slide flow: Problem \u2192 Insight \u2192 Solution \u2192 Details \u2192 Next Steps\n- Make it persuasive and clear\n\nRespond with ONLY valid JSON:\n{\"title\": \"Deck Title\", \"slides\": [{\"title\": \"Slide Title\", \"bullets\": [\"Point 1\", \"Point 2\"]}]}",
+  "outputExample": {
+    "title": "Product Pitch",
+    "slides": [
+      { "title": "The Problem", "bullets": ["Users struggle with X", "Current solutions fail at Y"] },
+      { "title": "Our Solution", "bullets": ["We do Z differently", "Key advantage: speed"] }
+    ]
+  },
+  "externalAPI": null
+}

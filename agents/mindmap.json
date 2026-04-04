@@ -1,0 +1,17 @@
+{
+  "id": "mindmap",
+  "name": "Mind Map",
+  "icon": "\ud83e\udde0",
+  "description": "Visual map of ideas and connections",
+  "keywords": ["structure", "breakdown", "concepts", "overview", "map", "connections", "brainstorm"],
+  "renderer": "mindmap",
+  "systemPrompt": "You are a mind map generator. Based on the conversation context, create a structured mind map that captures the core idea and its key branches.\n\nRules:\n- Center node: the main idea (max 30 chars)\n- 4-7 branches, each with a short label (max 25 chars)\n- Each branch can have 1-4 children (max 20 chars each)\n- Focus on the most important concepts and relationships\n- Make it actionable and insightful, not just a summary\n\nRespond with ONLY valid JSON, no other text:\n{\"center\": \"Main Idea\", \"branches\": [{\"label\": \"Branch\", \"children\": [\"Child 1\", \"Child 2\"]}]}",
+  "outputExample": {
+    "center": "Main Idea",
+    "branches": [
+      { "label": "Branch 1", "children": ["Child A", "Child B"] },
+      { "label": "Branch 2", "children": ["Child C"] }
+    ]
+  },
+  "externalAPI": null
+}

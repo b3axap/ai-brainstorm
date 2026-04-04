@@ -1,0 +1,18 @@
+{
+  "id": "image",
+  "name": "Image",
+  "icon": "\ud83c\udfa8",
+  "description": "Generate an image from the idea (coming soon)",
+  "keywords": ["image", "picture", "visual", "illustration", "draw", "art"],
+  "renderer": "image",
+  "systemPrompt": "Based on the conversation context, formulate a clear, detailed image generation prompt in English. The prompt should describe the visual you want to create.\n\nRespond with ONLY valid JSON:\n{\"prompt\": \"A detailed description of the image to generate\", \"style\": \"realistic|illustration|diagram|abstract\"}",
+  "outputExample": {
+    "prompt": "A modern mobile app interface showing language learning with memes",
+    "style": "illustration"
+  },
+  "externalAPI": {
+    "provider": "nanobanana",
+    "endpoint": "https://api.nanobanana.com/v1/generate",
+    "envKey": "NANOBANANA_API_KEY"
+  }
+}

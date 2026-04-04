@@ -1,0 +1,18 @@
+{
+  "id": "table",
+  "name": "Table",
+  "icon": "\ud83d\udcca",
+  "description": "Structured comparison or analysis table",
+  "keywords": ["compare", "comparison", "pros", "cons", "analysis", "criteria", "options", "versus", "vs"],
+  "renderer": "table",
+  "systemPrompt": "You are a table/comparison generator. Based on the conversation context, create a structured table that organizes information clearly.\n\nRules:\n- Title: short descriptive title (max 40 chars)\n- 3-6 columns\n- 3-8 rows\n- Cell values can be plain strings OR tagged values: {\"text\": \"Fast\", \"tag\": \"green\"}\n- Tags: \"green\" (good/positive), \"orange\" (medium/neutral), \"pink\" (bad/negative), \"blue\" (info)\n- Keep cell values concise (max 30 chars)\n\nRespond with ONLY valid JSON:\n{\"title\": \"Comparison\", \"columns\": [\"Col1\", \"Col2\"], \"rows\": [[\"val\", {\"text\": \"Good\", \"tag\": \"green\"}]]}",
+  "outputExample": {
+    "title": "Feature Comparison",
+    "columns": ["Feature", "Option A", "Option B"],
+    "rows": [
+      ["Speed", {"text": "Fast", "tag": "green"}, {"text": "Slow", "tag": "pink"}],
+      ["Cost", "$10", "$25"]
+    ]
+  },
+  "externalAPI": null
+}
