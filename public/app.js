@@ -340,7 +340,7 @@ socket.on('claude-chunk', ({ chunk }) => {
   appendStream(chunk);
 });
 
-socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, autoGenerate, confidence, reasoning }) => {
+socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase, offerCanvas }) => {
   endStreaming(fullMessage);
   state.generating = false;
 
@@ -350,101 +350,109 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, autoG
 
   const hasQuestions = clarifyQuestions && clarifyQuestions.length > 0;
   const hasSuggestions = suggestedTypes && suggestedTypes.length > 0;
-  const hasAuto = autoGenerate && autoGenerate.length > 0;
 
-  // If auto-generate is requested, launch those artifacts immediately
-  if (hasAuto) {
-    const autoNames = autoGenerate
-      .map(id => state.agents.find(a => a.id === id))
-      .filter(Boolean)
-      .map(a => `${a.icon} ${a.name}`);
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'claude-actions';
+  let hasContent = false;
 
-    if (autoNames.length > 0) {
-      const autoMsg = document.createElement('div');
-      autoMsg.className = 'auto-generate-notice';
-      autoMsg.innerHTML = `<span class="auto-spinner"></span> Generating: ${autoNames.join(', ')}...`;
-      lastMsg.appendChild(autoMsg);
+  // Render clarifying questions with answer options
+  if (hasQuestions) {
+    const questionsDiv = document.createElement('div');
+    questionsDiv.className = 'clarify-section';
+    clarifyQuestions.forEach(item => {
+      const questionText = typeof item === 'string' ? item : item.q;
+      const options = typeof item === 'object' && item.options ? item.options : [];
 
-      autoGenerate.forEach(typeId => {
-        const agent = state.agents.find(a => a.id === typeId);
-        if (agent) {
-          socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
-        }
-      });
-    }
+      const qBlock = document.createElement('div');
+      qBlock.className = 'clarify-block';
+
+      const qText = document.createElement('div');
+      qText.className = 'clarify-question';
+      qText.textContent = questionText;
+      qBlock.appendChild(qText);
+
+      if (options.length > 0) {
+        const optionsDiv = document.createElement('div');
+        optionsDiv.className = 'clarify-options';
+        options.forEach(opt => {
+          const btn = document.createElement('button');
+          btn.className = 'clarify-option-btn';
+          btn.textContent = opt;
+          btn.onclick = () => {
+            const input = document.getElementById('chatInput');
+            const current = input.value.trim();
+            input.value = current ? current + '. ' + opt : opt;
+            input.focus();
+            btn.classList.add('selected');
+          };
+          optionsDiv.appendChild(btn);
+        });
+        qBlock.appendChild(optionsDiv);
+      }
+
+      questionsDiv.appendChild(qBlock);
+    });
+    actionsDiv.appendChild(questionsDiv);
+    hasContent = true;
   }
 
-  // Build action buttons for remaining suggestions
-  if (hasQuestions || hasSuggestions) {
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'claude-actions';
+  // Canvas offer: show visualization picker button (user decides when to generate)
+  if (offerCanvas && hasSuggestions) {
+    const canvasOffer = document.createElement('div');
+    canvasOffer.className = 'canvas-offer';
 
-    if (hasQuestions) {
-      const qLabel = document.createElement('div');
-      qLabel.className = 'actions-label';
-      qLabel.textContent = '\u2753 Clarifying questions:';
-      actionsDiv.appendChild(qLabel);
+    const offerLabel = document.createElement('div');
+    offerLabel.className = 'canvas-offer-label';
+    offerLabel.textContent = '\uD83C\uDFA8 Ready to visualize? Pick what to generate:';
+    canvasOffer.appendChild(offerLabel);
 
-      const questionsDiv = document.createElement('div');
-      questionsDiv.className = 'clarify-buttons';
-      clarifyQuestions.forEach(question => {
-        const btn = document.createElement('button');
-        btn.className = 'clarify-btn';
-        btn.textContent = question;
-        btn.onclick = () => {
-          const input = document.getElementById('chatInput');
-          input.value = question;
-          input.focus();
-        };
-        questionsDiv.appendChild(btn);
-      });
-      actionsDiv.appendChild(questionsDiv);
-    }
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.className = 'suggest-buttons';
+    suggestedTypes.forEach(typeId => {
+      const agent = state.agents.find(a => a.id === typeId);
+      if (!agent) return;
+      const btn = document.createElement('button');
+      btn.className = 'suggest-btn';
+      btn.innerHTML = `${agent.icon} ${agent.name}`;
+      btn.onclick = () => {
+        if (state.generating) return;
+        state.generating = true;
+        btn.innerHTML = `<span class="auto-spinner"></span> ${agent.name}...`;
+        btn.disabled = true;
+        socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
+        showToast(`Generating ${agent.name}...`);
+      };
+      buttonsDiv.appendChild(btn);
+    });
+    canvasOffer.appendChild(buttonsDiv);
 
-    if (hasSuggestions) {
-      // Filter out already auto-generated types
-      const remainingTypes = hasAuto
-        ? suggestedTypes.filter(t => !autoGenerate.includes(t))
-        : suggestedTypes;
-
-      if (remainingTypes.length > 0) {
-        const sLabel = document.createElement('div');
-        sLabel.className = 'actions-label';
-        sLabel.textContent = hasAuto ? 'Also available:' : (hasQuestions ? '\u2728 Or generate right away:' : '\u2728 Suggested visualizations:');
-        actionsDiv.appendChild(sLabel);
-
-        // Show reasoning if available
-        if (reasoning && !hasAuto) {
-          const reasonDiv = document.createElement('div');
-          reasonDiv.className = 'suggest-reasoning';
-          reasonDiv.textContent = reasoning;
-          actionsDiv.appendChild(reasonDiv);
-        }
-
-        const buttonsDiv = document.createElement('div');
-        buttonsDiv.className = 'suggest-buttons';
-        remainingTypes.forEach((typeId, idx) => {
+    // "Generate all" button
+    if (suggestedTypes.length > 1) {
+      const allBtn = document.createElement('button');
+      allBtn.className = 'generate-all-btn';
+      allBtn.textContent = '\u26A1 Generate all';
+      allBtn.onclick = () => {
+        if (state.generating) return;
+        state.generating = true;
+        allBtn.innerHTML = '<span class="auto-spinner"></span> Generating...';
+        allBtn.disabled = true;
+        buttonsDiv.querySelectorAll('.suggest-btn').forEach(b => b.disabled = true);
+        suggestedTypes.forEach(typeId => {
           const agent = state.agents.find(a => a.id === typeId);
-          if (!agent) return;
-          const btn = document.createElement('button');
-          // First suggestion is highlighted if confidence is decent
-          const isTop = idx === 0 && confidence >= 0.6 && !hasAuto;
-          btn.className = `suggest-btn${isTop ? ' suggest-btn-top' : ''}`;
-          btn.innerHTML = `${agent.icon} ${agent.name}`;
-          btn.onclick = () => {
-            if (state.generating) return;
-            state.generating = true;
-            buttonsDiv.querySelectorAll('.suggest-btn').forEach(b => b.disabled = true);
-            btn.innerHTML = `<span class="auto-spinner"></span> ${agent.name}...`;
+          if (agent) {
             socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
-            showToast(`Generating ${agent.name}...`);
-          };
-          buttonsDiv.appendChild(btn);
+          }
         });
-        actionsDiv.appendChild(buttonsDiv);
-      }
+        showToast('Generating all visualizations...');
+      };
+      canvasOffer.appendChild(allBtn);
     }
 
+    actionsDiv.appendChild(canvasOffer);
+    hasContent = true;
+  }
+
+  if (hasContent) {
     lastMsg.appendChild(actionsDiv);
     container.scrollTop = container.scrollHeight;
   }
@@ -460,24 +468,10 @@ socket.on('artifact-created', ({ artifact }) => {
   state.generating = false;
   renderArtifactCard(artifact);
 
-  // Remove any auto-generate notices for this type
-  document.querySelectorAll('.auto-generate-notice').forEach(el => {
-    el.innerHTML = `<span style="color:var(--green);">&#10003;</span> ${artifact.icon} ${escHtml(artifact.title)} created!`;
-    el.style.animation = 'none';
-    setTimeout(() => el.remove(), 3000);
-  });
+  showToast(`${artifact.icon} ${artifact.title} created!`);
 
-  // Show toast with option to view on canvas
-  if (state.screen === 'chat') {
-    showToast(`${artifact.icon} ${artifact.title} created! Click "Canvas" to view.`);
-  } else {
-    showToast(`${artifact.icon} ${artifact.title} created!`);
-  }
-
-  // Auto-switch to canvas on first artifact
-  if (state.artifacts.length === 1 && state.screen === 'chat') {
-    setTimeout(() => showScreen('canvas'), 800);
-  }
+  // Re-enable generation for next artifact
+  state.generating = false;
 });
 
 socket.on('artifact-moved', ({ artifactId, position }) => {

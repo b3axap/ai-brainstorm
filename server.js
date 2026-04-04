@@ -64,74 +64,95 @@ Your job is to help users develop their ideas, make connections between differen
   return { systemBase, messages: msgs };
 }
 
-// --- Chat analysis: Claude responds and suggests visualization types ---
+// --- Chat analysis: Claude responds with structured flow ---
 async function handleChatAnalysis(room, socket) {
   const { systemBase, messages } = buildContext(room);
   const agentList = getAgentSummaries()
     .map(a => `${a.id}: ${a.icon} ${a.name} — ${a.description}`)
     .join('\n');
 
-  const isFirstMessage = room.messages.filter(m => m.role === 'user').length <= 1;
+  // Track conversation phase
+  const userMsgCount = room.messages.filter(m => m.role === 'user').length;
+  const isFirstMessage = userMsgCount <= 1;
+  const mandatoryDone = room.mandatoryQuestionsDone || false;
+  // After mandatory phase, count user messages since mandatory was completed
+  const msgsSinceMandatory = mandatoryDone ? (userMsgCount - (room.mandatoryDoneAtMsg || 0)) : 0;
+  const shouldOfferCanvas = mandatoryDone && (msgsSinceMandatory === 1 || msgsSinceMandatory % 3 === 0);
+
+  let phasePrompt;
+  if (isFirstMessage) {
+    phasePrompt = `This is the user's FIRST message about their idea.
+
+STRICT STRUCTURE for your response:
+1. **SUMMARY** — Briefly restate the idea in 2-3 sentences. Show you understand the core concept and its value.
+2. **MANDATORY QUESTIONS** — You MUST ask exactly 4 questions to deeply understand the idea. These questions should cover:
+   - Target audience / users
+   - Core problem being solved or key value proposition
+   - Scale / scope (MVP vs full product, market size, etc.)
+   - Key differentiator or unique angle
+   Each question MUST have 2-3 short answer options for the user to click.
+
+In the JSON block, include:
+{"questions": [{"q": "...", "options": ["...", "..."]}, ...4 items], "phase": "mandatory"}`;
+  } else if (!mandatoryDone) {
+    phasePrompt = `The user is answering mandatory discovery questions. Acknowledge their answers briefly, then continue with any remaining mandatory questions (total should reach 4).
+
+If all 4 mandatory questions have been answered, respond with a brief synthesis of what you've learned and set phase to "mandatory_done".
+
+In the JSON block:
+- If more questions needed: {"questions": [...remaining], "phase": "mandatory"}
+- If all 4 answered: {"phase": "mandatory_done", "suggest": ["agent_id_1", "agent_id_2", "agent_id_3"]}`;
+  } else {
+    phasePrompt = `The mandatory discovery phase is complete. You are now in FREE BRAINSTORM mode.
+Respond naturally. Help develop the idea further. You may ask 0-3 follow-up questions if something new comes up.
+
+${shouldOfferCanvas ? 'IMPORTANT: Include "offer_canvas": true in the JSON to show the user a "Generate to Canvas" button with visualization options.' : ''}
+
+In the JSON block, always include:
+- "suggest": array of 2-3 best visualization types for this idea
+- "questions": optional array of 0-3 question objects (only if genuinely needed)
+${shouldOfferCanvas ? '- "offer_canvas": true' : ''}
+- "phase": "free"`;
+  }
 
   const systemPrompt = `${systemBase}
 
 RESPONSE STRUCTURE:
 
-${isFirstMessage ? `This is the user's FIRST message about their idea. Follow this structure strictly:
+${phasePrompt}
 
-1. **SUMMARY** — Start with a brief analysis (2-3 sentences). Restate what you understood about the idea, highlight its core value and key aspects. Show that you "get it".
-
-2. **CLARIFYING QUESTIONS** (0 to 3) — Only if genuinely needed. Ask specific, actionable questions about unclear aspects (target audience, scope, key features, constraints). If the idea is already detailed and clear — ask 0 questions. Never ask generic filler questions.
-
-3. **VISUALIZATION SUGGESTIONS** — Always suggest 2-3 visualization types that would be most useful at this stage.` : `This is a follow-up message in an ongoing conversation. Respond naturally and helpfully. Do NOT repeat the summary — just address what the user said and move the brainstorm forward. Always suggest 2-3 visualization types.`}
-
-AVAILABLE VISUALIZATION TYPES (catalog):
+AVAILABLE VISUALIZATION TYPES:
 ${agentList}
 
-HYBRID VISUALIZATION SYSTEM:
-You have two modes for creating visualizations:
-
-1. **Catalog mode** (preferred) — Use one of the available types listed above. Fast, reliable, consistent.
-2. **Freeform mode** — When NO catalog type fits well, use "freeform" to generate a custom HTML visualization. Use this for:
-   - Unique comparisons, calculators, or interactive widgets
-   - Visualizations that don't map to any catalog type
-   - When the user explicitly asks for something creative/custom
-
 CHOOSING THE RIGHT VISUALIZATION:
-Think about WHAT the user needs, not just what they said:
-- Comparing options? → table, pros_cons, matrix, or freeform comparison
+- Comparing options? → table, pros_cons, matrix
 - Breaking down a concept? → mindmap
 - Planning phases? → timeline, kanban
 - Analyzing strengths/weaknesses? → swot, pros_cons
-- Showing proportions? → donut_chart
 - Process or flow? → diagram
-- Need something totally custom? → freeform
-- Quick insight or key takeaway? → quote_card
+- Custom/interactive? → freeform
+- Quick insight? → quote_card
 
-CRITICAL: End your response with a single JSON block on its own line:
-- "suggest": array of 2-3 agent IDs — your recommended visualizations, BEST first
-- "confidence": number 0.0-1.0 — how confident you are that the FIRST suggestion is the right one
-- "reasoning": string — one sentence explaining WHY the first suggestion fits best
-- "questions": array of 0-3 clarifying questions (omit if 0)
-- "auto": array of agent IDs to auto-generate immediately (when confidence >= 0.8)
+JSON FORMAT (must be the LAST thing in your response, on its own line):
+- "phase": "mandatory" | "mandatory_done" | "free"
+- "questions": array of question objects with "q" and "options" (2-3 options each)
+- "suggest": array of 2-3 agent IDs (required when phase is "mandatory_done" or "free")
+- "offer_canvas": true (only when explicitly told to include it above)
 
 Examples:
-{"suggest": ["mindmap", "table"], "confidence": 0.9, "reasoning": "First brainstorm — mind map gives the best overview of all aspects", "auto": ["mindmap"]}
+{"questions": [{"q": "Who is the target audience?", "options": ["B2B", "B2C", "Both"]}], "phase": "mandatory"}
 
-{"suggest": ["pros_cons", "table", "freeform"], "confidence": 0.85, "reasoning": "User is comparing two options — pros/cons is the clearest format", "auto": ["pros_cons"]}
+{"phase": "mandatory_done", "suggest": ["mindmap", "table", "diagram"]}
 
-{"suggest": ["freeform", "diagram"], "confidence": 0.7, "reasoning": "User wants an interactive calculator — no catalog type fits, freeform is best"}
+{"suggest": ["swot", "pros_cons"], "phase": "free", "offer_canvas": true}
 
-{"questions": ["Who is the target audience?"], "suggest": ["mindmap", "swot"], "confidence": 0.6, "reasoning": "Idea is vague — mind map can help structure, but need more context first"}
+{"questions": [{"q": "Have you considered monetization?", "options": ["Subscription", "Freemium", "One-time"]}], "suggest": ["table", "mindmap"], "phase": "free"}
 
 Rules:
 - The JSON block must be the LAST thing in your response, on its own line.
-- ALWAYS include "suggest" with 2-3 agent IDs, best first.
-- ALWAYS include "confidence" (0.0-1.0) for your top suggestion.
-- "auto" should include items only when confidence >= 0.8.
-- Prefer catalog types over freeform when a good match exists.
-- Use freeform for genuinely unique visualizations, not as a lazy default.
-- Keep your text response concise and focused. No fluff.
+- During mandatory phase: ALWAYS include exactly 4 questions on first message.
+- During free phase: questions are optional (0-3).
+- Keep text concise. No fluff.
 - Use Russian language if the user writes in Russian.`;
 
   try {
@@ -151,36 +172,50 @@ Rules:
 
     await stream.finalMessage();
 
-    // Parse JSON block at end (unified format with suggest + confidence + optional questions + optional auto)
+    // Parse JSON block at end
     let suggestedTypes = [];
     let clarifyQuestions = [];
-    let autoGenerate = [];
-    let confidence = 0;
-    let reasoning = '';
+    let phase = '';
+    let offerCanvas = false;
 
-    const jsonMatch = fullResponse.match(/\{[^{}]*"suggest"\s*:\s*\[[^\]]*\][^{}]*\}/);
+    // Try to find any JSON block at the end of the response
+    const jsonMatch = fullResponse.match(/\{[\s\S]*"phase"\s*:[\s\S]*\}$/m)
+      || fullResponse.match(/\{[^{}]*"phase"\s*:[^{}]*\}/);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
         suggestedTypes = parsed.suggest || [];
         clarifyQuestions = parsed.questions || [];
-        autoGenerate = parsed.auto || [];
-        confidence = parsed.confidence || 0;
-        reasoning = parsed.reasoning || '';
+        phase = parsed.phase || '';
+        offerCanvas = parsed.offer_canvas || false;
       } catch (e) { /* ignore parse error */ }
-    } else {
-      // Fallback: try separate patterns for backward compatibility
-      const suggestOnly = fullResponse.match(/\{"suggest":\s*\[([^\]]+)\]\}/);
-      const questionsOnly = fullResponse.match(/\{"questions":\s*\[([^\]]+)\]\}/);
-      if (suggestOnly) try { suggestedTypes = JSON.parse(suggestOnly[0]).suggest || []; } catch(e) {}
-      if (questionsOnly) try { clarifyQuestions = JSON.parse(questionsOnly[0]).questions || []; } catch(e) {}
+    }
+
+    // Fallback: try to find any JSON with questions or suggest
+    if (!phase) {
+      const fallback = fullResponse.match(/\{[^{}]*"(?:suggest|questions)"\s*:\s*\[[^\]]*\][^{}]*\}/);
+      if (fallback) {
+        try {
+          const parsed = JSON.parse(fallback[0]);
+          suggestedTypes = parsed.suggest || [];
+          clarifyQuestions = parsed.questions || [];
+        } catch(e) {}
+      }
+    }
+
+    // Track mandatory phase completion
+    if (phase === 'mandatory_done' && !room.mandatoryQuestionsDone) {
+      room.mandatoryQuestionsDone = true;
+      room.mandatoryDoneAtMsg = room.messages.filter(m => m.role === 'user').length;
+      offerCanvas = true; // Always offer canvas right after mandatory phase
     }
 
     // Clean response text (remove JSON block)
     const cleanResponse = fullResponse
+      .replace(/\{[\s\S]*"phase"\s*:[\s\S]*\}$/m, '')
+      .replace(/\{[^{}]*"phase"\s*:[^{}]*\}/, '')
       .replace(/\{[^{}]*"suggest"\s*:\s*\[[^\]]*\][^{}]*\}/, '')
-      .replace(/\{"suggest":\s*\[[^\]]*\]\}/, '')
-      .replace(/\{"questions":\s*\[[^\]]*\]\}/, '')
+      .replace(/\{[^{}]*"questions"\s*:\s*\[[^\]]*\][^{}]*\}/, '')
       .trim();
 
     // Store assistant message
@@ -197,9 +232,8 @@ Rules:
       fullMessage: cleanResponse,
       suggestedTypes: suggestedTypes,
       clarifyQuestions: clarifyQuestions,
-      autoGenerate: autoGenerate,
-      confidence: confidence,
-      reasoning: reasoning
+      phase: phase,
+      offerCanvas: offerCanvas
     });
 
   } catch (error) {
@@ -348,7 +382,9 @@ io.on('connection', (socket) => {
         id: id,
         messages: [],
         artifacts: [],
-        users: []
+        users: [],
+        mandatoryQuestionsDone: false,
+        mandatoryDoneAtMsg: 0
       };
       rooms[id] = room;
     }
