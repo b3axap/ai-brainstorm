@@ -132,6 +132,33 @@ function addSuggestButtons(suggestedTypes) {
   container.scrollTop = container.scrollHeight;
 }
 
+function addClarifyQuestions(questions) {
+  const container = document.getElementById('chatMessages');
+  const lastMsg = container.querySelector('.message:last-child');
+  if (!lastMsg) return;
+
+  const existing = lastMsg.querySelector('.clarify-buttons');
+  if (existing) existing.remove();
+
+  const questionsDiv = document.createElement('div');
+  questionsDiv.className = 'clarify-buttons';
+
+  questions.forEach(question => {
+    const btn = document.createElement('button');
+    btn.className = 'clarify-btn';
+    btn.textContent = question;
+    btn.onclick = () => {
+      const input = document.getElementById('chatInput');
+      input.value = question;
+      input.focus();
+    };
+    questionsDiv.appendChild(btn);
+  });
+
+  lastMsg.appendChild(questionsDiv);
+  container.scrollTop = container.scrollHeight;
+}
+
 // Streaming: Claude response building
 let streamingMsgId = null;
 
@@ -371,7 +398,7 @@ socket.on('claude-chunk', ({ chunk }) => {
   appendStream(chunk);
 });
 
-socket.on('claude-done', ({ fullMessage, suggestedTypes }) => {
+socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions }) => {
   endStreaming(fullMessage);
 
   // Store in messages
@@ -379,7 +406,9 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes }) => {
   // Don't double-add if streaming already added it
   state.generating = false;
 
-  if (suggestedTypes && suggestedTypes.length > 0) {
+  if (clarifyQuestions && clarifyQuestions.length > 0) {
+    addClarifyQuestions(clarifyQuestions);
+  } else if (suggestedTypes && suggestedTypes.length > 0) {
     addSuggestButtons(suggestedTypes);
   }
 });

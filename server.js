@@ -63,13 +63,24 @@ async function handleChatAnalysis(room, socket) {
 
   const systemPrompt = `${systemBase}
 
-IMPORTANT: After your conversational response, you MUST suggest 2-3 visualization types that would help communicate this idea. Choose from:
-${agentList}
+IMPORTANT: After your conversational response, decide which mode to use:
 
+MODE 1 — CLARIFY (use when the idea is vague, too broad, or missing key details):
+Ask 2-3 short clarifying questions to better understand the user's idea. Be specific and actionable — don't ask generic questions.
+End your response with a JSON block on its own line:
+{"questions": ["Question 1?", "Question 2?", "Question 3?"]}
+
+MODE 2 — SUGGEST (use when the idea is clear enough to visualize):
+Suggest 2-3 visualization types from:
+${agentList}
 End your response with a JSON block on its own line:
 {"suggest": ["agent_id_1", "agent_id_2"]}
 
-The JSON must be the LAST thing in your response, on its own line.`;
+Rules:
+- Use MODE 1 only for the FIRST message about a new idea if it's genuinely unclear. Once the user has provided enough context (even in follow-ups), switch to MODE 2.
+- If the idea is already detailed and actionable, go straight to MODE 2.
+- The JSON block must be the LAST thing in your response, on its own line.
+- Use ONLY one mode per response, never both.`;
 
   try {
     let fullResponse = '';
@@ -88,18 +99,28 @@ The JSON must be the LAST thing in your response, on its own line.`;
 
     await stream.finalMessage();
 
-    // Parse suggested types from JSON block at end
+    // Parse JSON block at end: either {"suggest": [...]} or {"questions": [...]}
     let suggestedTypes = [];
-    const jsonMatch = fullResponse.match(/\{"suggest":\s*\[([^\]]+)\]\}/);
-    if (jsonMatch) {
+    let clarifyQuestions = [];
+
+    const suggestMatch = fullResponse.match(/\{"suggest":\s*\[([^\]]+)\]\}/);
+    const questionsMatch = fullResponse.match(/\{"questions":\s*\[([^\]]+)\]\}/);
+
+    if (suggestMatch) {
       try {
-        const parsed = JSON.parse(jsonMatch[0]);
-        suggestedTypes = parsed.suggest || [];
+        suggestedTypes = JSON.parse(suggestMatch[0]).suggest || [];
+      } catch (e) { /* ignore parse error */ }
+    } else if (questionsMatch) {
+      try {
+        clarifyQuestions = JSON.parse(questionsMatch[0]).questions || [];
       } catch (e) { /* ignore parse error */ }
     }
 
-    // Clean response text (remove the JSON block)
-    const cleanResponse = fullResponse.replace(/\{"suggest":\s*\[[^\]]*\]\}/, '').trim();
+    // Clean response text (remove any JSON block)
+    const cleanResponse = fullResponse
+      .replace(/\{"suggest":\s*\[[^\]]*\]\}/, '')
+      .replace(/\{"questions":\s*\[[^\]]*\]\}/, '')
+      .trim();
 
     // Store assistant message
     room.messages.push({
@@ -113,7 +134,8 @@ The JSON must be the LAST thing in your response, on its own line.`;
     io.to(room.id).emit('claude-done', {
       roomId: room.id,
       fullMessage: cleanResponse,
-      suggestedTypes: suggestedTypes
+      suggestedTypes: suggestedTypes,
+      clarifyQuestions: clarifyQuestions
     });
 
   } catch (error) {
