@@ -43,6 +43,22 @@ function generateId() {
 
 const COLORS = ['#6c5ce7', '#00cec9', '#fdcb6e', '#fd79a8', '#74b9ff', '#ff6b6b', '#a29bfe', '#55efc4'];
 
+// Grid-based positioning for artifacts (2 columns, 540px wide + 40px gap)
+function calcArtifactPosition(index) {
+  const COLS = 2;
+  const CARD_W = 540;
+  const CARD_H = 360;
+  const GAP = 40;
+  const OFFSET_X = 40;
+  const OFFSET_Y = 40;
+  const col = index % COLS;
+  const row = Math.floor(index / COLS);
+  return {
+    x: OFFSET_X + col * (CARD_W + GAP),
+    y: OFFSET_Y + row * (CARD_H + GAP)
+  };
+}
+
 // --- Context builder: uses per-user chat history ---
 function buildContext(room, socketId) {
   const userNames = room.users.map(u => u.name).join(', ') || 'none';
@@ -116,24 +132,19 @@ GUIDELINES (not rigid rules):
    - The user can ALWAYS type their own answer regardless, options are just shortcuts
    - Don't force options where they don't make sense
 
-4. CANVAS ACTIONS:
+${room.artifacts.length > 0 ? `4. CANVAS ACTIONS:
    When the user CLEARLY wants to create, update, or transform a visualization, include "canvas_action":
    - "make a mindmap" → canvas_action: {"intent":"create", "artifact_type":"mindmap"}
    - "update the table" → canvas_action: {"intent":"update", "target_id":"<id>", "instruction":"..."}
    - "convert to presentation" → canvas_action: {"intent":"transform", "target_id":"<id>", "artifact_type":"presentation"}
    Only when intent is UNAMBIGUOUS. Normal discussion does NOT get canvas_action.
-
+` : ''}
 AVAILABLE VISUALIZATION TYPES:
 ${agentList}
 
-WHEN TO SUGGEST WHAT:
-- Comparing options? → table, pros_cons, matrix
-- Breaking down a concept? → mindmap
-- Planning phases? → timeline, kanban
-- Analyzing strengths/weaknesses? → swot, pros_cons
-- Process or flow? → diagram
-- Custom/interactive? → freeform
-- Quick insight? → quote_card
+CHOOSING VISUALIZATIONS:
+${isFirstMessage ? 'mindmap is usually a great start for a new idea.' : `- Comparing? → table, pros_cons, matrix | Breakdown? → mindmap | Planning? → timeline, kanban
+- Analysis? → swot, pros_cons | Process? → diagram | Custom? → freeform | Insight? → quote_card`}
 
 JSON BLOCK (LAST thing in your response, on its own line):
 All fields are OPTIONAL — include only what's relevant:
@@ -144,14 +155,8 @@ All fields are OPTIONAL — include only what's relevant:
 
 Examples:
 {"questions": [{"q": "Who is this for?", "options": ["B2B", "B2C", "Both"]}, "What problem does it solve?"]}
-
 {"suggest": ["mindmap", "table"], "offer_canvas": true}
-
-{"questions": [{"q": "Ready to visualize?", "options": ["Yes, let's go", "Not yet, more questions"]}], "suggest": ["swot", "diagram"], "offer_canvas": true}
-
 {"canvas_action": {"intent": "create", "artifact_type": "mindmap"}}
-
-{}
 
 Rules:
 - JSON block must be the LAST line.
@@ -392,7 +397,7 @@ async function handleArtifactGeneration(room, type, userName, socket, referenceI
         renderer: agent.renderer,
         icon: agent.icon,
         timestamp: Date.now(),
-        position: { x: 50 + Math.random() * 400, y: 50 + Math.random() * 300 }
+        position: calcArtifactPosition(room.artifacts.length)
       };
 
       room.artifacts.push(artifact);
@@ -470,7 +475,7 @@ async function handleArtifactGeneration(room, type, userName, socket, referenceI
       renderer: agent.renderer,
       icon: agent.icon,
       timestamp: Date.now(),
-      position: { x: 50 + room.artifacts.length * 60 + Math.random() * 200, y: 50 + room.artifacts.length * 40 + Math.random() * 200 }
+      position: calcArtifactPosition(room.artifacts.length)
     };
 
     room.artifacts.push(artifact);

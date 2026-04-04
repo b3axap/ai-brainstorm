@@ -121,9 +121,10 @@ function addChatMessage(message) {
   div.id = `msg-${message.id}`;
 
   const nameLabel = message.role === 'assistant' ? 'Claude' : message.userName || 'User';
+  const bubbleContent = message.role === 'assistant' ? renderMarkdown(message.content) : escHtml(message.content);
   div.innerHTML = `
     <div class="msg-header"><span class="name">${escHtml(nameLabel)}</span></div>
-    <div class="msg-bubble">${escHtml(message.content)}</div>
+    <div class="msg-bubble">${bubbleContent}</div>
   `;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
@@ -166,7 +167,7 @@ function endStreaming(fullMessage) {
     const msgEl = document.getElementById(`msg-${streamingMsgId}`);
     if (msgEl) {
       const bubble = msgEl.querySelector('.msg-bubble');
-      if (bubble) bubble.textContent = fullMessage;
+      if (bubble) bubble.innerHTML = renderMarkdown(fullMessage);
     }
   }
   streamingMsgId = null;
@@ -462,6 +463,8 @@ function renderArtifactCard(artifact) {
       <button class="art-action-btn" data-action="expand" title="Expand / deepen">⊕ Expand</button>
       <button class="art-action-btn" data-action="transform" title="Convert to another type">⟲ Transform</button>
       <button class="art-action-btn" data-action="ask" title="Ask about this">? Ask</button>
+      <button class="art-action-btn" data-action="copy" title="Copy data to clipboard">⎘ Copy</button>
+      <button class="art-action-btn" data-action="screenshot" title="Save as PNG">📷 PNG</button>
     </div>
     <div class="artifact-head">
       <span class="a-icon">${artifact.icon || '📄'}</span>
@@ -527,6 +530,27 @@ function setupArtifactActions(card, artifact) {
     if (askBar.classList.contains('visible')) askBar.querySelector('input').focus();
   };
 
+  // Copy data to clipboard
+  card.querySelector('[data-action="copy"]').onclick = (e) => {
+    e.stopPropagation();
+    const text = JSON.stringify(artifact.data, null, 2);
+    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+  };
+
+  // Screenshot as PNG
+  card.querySelector('[data-action="screenshot"]').onclick = async (e) => {
+    e.stopPropagation();
+    if (typeof html2canvas === 'undefined') {
+      showToast('Loading screenshot tool...');
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      script.onload = () => captureArtifactPNG(card, artifact);
+      document.head.appendChild(script);
+    } else {
+      captureArtifactPNG(card, artifact);
+    }
+  };
+
   // Ask bar submit
   const askBar = document.getElementById(`askbar-${artifact.id}`);
   const askInput = askBar.querySelector('input');
@@ -536,6 +560,25 @@ function setupArtifactActions(card, artifact) {
   askInput.onkeypress = (e) => {
     if (e.key === 'Enter') submitAskQuestion(artifact, askInput, askBar, card);
   };
+}
+
+async function captureArtifactPNG(card, artifact) {
+  try {
+    // Temporarily hide action bar
+    const actions = card.querySelector('.artifact-actions');
+    if (actions) actions.style.display = 'none';
+    const canvas = await html2canvas(card, { backgroundColor: '#1a1d27', scale: 2 });
+    if (actions) actions.style.display = '';
+
+    const link = document.createElement('a');
+    link.download = `${(artifact.title || 'artifact').replace(/[^a-z0-9]/gi, '_')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('PNG saved!');
+  } catch (err) {
+    showToast('Screenshot failed');
+    console.error('Screenshot error:', err);
+  }
 }
 
 function submitAskQuestion(artifact, askInput, askBar, card) {
@@ -824,13 +867,24 @@ socket.on('artifact-generating', ({ type }) => {
 socket.on('artifact-created', ({ artifact }) => {
   state.artifacts.push(artifact);
   state.generating = false;
-  renderArtifactCard(artifact);
+  const card = renderArtifactCard(artifact);
   showToast(`${artifact.icon || '📄'} ${artifact.title || 'Untitled'} created!`);
 
   // On mobile, switch to canvas to show the new artifact
   if (window.innerWidth <= 768) {
     const tabCanvas = document.getElementById('mobileTabCanvas');
     if (tabCanvas) tabCanvas.click();
+  }
+
+  // Smooth scroll canvas to the new artifact
+  if (card) {
+    setTimeout(() => {
+      const panel = document.getElementById('canvasPanel');
+      if (panel) {
+        const pos = artifact.position || { x: 0, y: 0 };
+        panel.scrollTo({ left: Math.max(0, pos.x - 40), top: Math.max(0, pos.y - 40), behavior: 'smooth' });
+      }
+    }, 100);
   }
 });
 
@@ -887,4 +941,16 @@ function escHtml(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
+}
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  if (typeof marked !== 'undefined' && marked.parse) {
+    try {
+      return marked.parse(text, { breaks: true, gfm: true });
+    } catch (e) {
+      return escHtml(text);
+    }
+  }
+  return escHtml(text);
 }

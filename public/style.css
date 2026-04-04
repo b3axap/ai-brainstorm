@@ -87,7 +87,18 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .message.assistant { align-self: flex-start; max-width: 90%; }
 .message .msg-header { font-size: 11px; color: var(--text2); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
 .message .msg-header .name { font-weight: 600; color: var(--text); }
-.message .msg-bubble { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; word-wrap: break-word; white-space: pre-wrap; }
+.message .msg-bubble { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; word-wrap: break-word; }
+.message.user .msg-bubble { white-space: pre-wrap; }
+.message.assistant .msg-bubble p { margin: 0 0 8px 0; }
+.message.assistant .msg-bubble p:last-child { margin-bottom: 0; }
+.message.assistant .msg-bubble strong { color: var(--accent2); }
+.message.assistant .msg-bubble ul, .message.assistant .msg-bubble ol { padding-left: 18px; margin: 4px 0 8px; }
+.message.assistant .msg-bubble li { margin-bottom: 2px; }
+.message.assistant .msg-bubble code { background: var(--surface3); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.message.assistant .msg-bubble pre { background: var(--surface3); padding: 8px 10px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+.message.assistant .msg-bubble pre code { background: none; padding: 0; }
+.message.assistant .msg-bubble h1, .message.assistant .msg-bubble h2, .message.assistant .msg-bubble h3 { font-size: 14px; margin: 10px 0 4px; color: var(--accent2); }
+.message.assistant .msg-bubble blockquote { border-left: 3px solid var(--accent); padding-left: 10px; margin: 6px 0; color: var(--text2); }
 .message.user .msg-bubble { background: var(--accent); border-bottom-right-radius: 4px; }
 .message.assistant .msg-bubble { background: var(--surface2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 .suggest-buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
