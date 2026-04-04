@@ -378,15 +378,154 @@ class InteractiveEngine {
     };
   }
 
-  // --- Custom events from renderers (e.g. presentation add-slide) ---
+  // --- Custom events from renderers ---
   attachCustomEvents() {
-    const handler = (e) => {
-      if (e.type === 'bs-add-slide') {
-        this.emitArrayOp('insert', 'slides', { title: 'New Slide', bullets: ['Point 1'] });
+    // Presentation: add slide
+    const slideHandler = (e) => {
+      this.emitArrayOp('insert', 'slides', { title: 'New Slide', bullets: ['Point 1'] });
+    };
+    this.body.addEventListener('bs-add-slide', slideHandler);
+    this._listeners.push([this.body, 'bs-add-slide', slideHandler]);
+
+    // Diagram: mermaid code save
+    const mermaidHandler = (e) => {
+      if (e.detail && e.detail.value != null) {
+        this.emitPatch('mermaid', e.detail.value);
       }
     };
-    this.body.addEventListener('bs-add-slide', handler);
-    this._listeners.push([this.body, 'bs-add-slide', handler]);
+    this.body.addEventListener('bs-mermaid-save', mermaidHandler);
+    this._listeners.push([this.body, 'bs-mermaid-save', mermaidHandler]);
+
+    // Mindmap: SVG node dragging
+    this.attachMindmapDrag();
+  }
+
+  // --- MINDMAP: SVG node dragging ---
+  attachMindmapDrag() {
+    const type = this.artifact.renderer || this.artifact.type;
+    if (type !== 'mindmap') return;
+
+    const svg = this.body.querySelector('svg.mindmap-svg');
+    if (!svg) return;
+
+    const nodes = svg.querySelectorAll('.bs-mm-draggable');
+    if (!nodes.length) return;
+
+    let dragging = null;
+
+    const toSVG = (clientX, clientY) => {
+      const pt = svg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return { x: 0, y: 0 };
+      const svgPt = pt.matrixTransform(ctm.inverse());
+      return { x: svgPt.x, y: svgPt.y };
+    };
+
+    const onMouseDown = (e) => {
+      const node = e.target.closest('.bs-mm-draggable');
+      if (!node) return;
+      // Don't drag if editing (foreignObject input active)
+      if (svg.querySelector('foreignObject')) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = node.querySelector('rect');
+      const text = node.querySelector('text');
+      if (!rect || !text) return;
+
+      const start = toSVG(e.clientX, e.clientY);
+      const origRX = parseFloat(rect.getAttribute('x'));
+      const origRY = parseFloat(rect.getAttribute('y'));
+      const origTX = parseFloat(text.getAttribute('x'));
+      const origTY = parseFloat(text.getAttribute('y'));
+      const rw = parseFloat(rect.getAttribute('width'));
+      const rh = parseFloat(rect.getAttribute('height'));
+      // Node center
+      const nodeCX = origRX + rw / 2;
+      const nodeCY = origRY + rh / 2;
+
+      const nodeId = node.dataset.mmNode; // e.g. "branch-0" or "child-1-2"
+
+      node.style.cursor = 'grabbing';
+      dragging = { node, rect, text, start, origRX, origRY, origTX, origTY, rw, rh, nodeCX, nodeCY, nodeId };
+    };
+
+    const onMouseMove = (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const cur = toSVG(e.clientX, e.clientY);
+      const dx = cur.x - dragging.start.x;
+      const dy = cur.y - dragging.start.y;
+
+      // Move rect and text
+      dragging.rect.setAttribute('x', dragging.origRX + dx);
+      dragging.rect.setAttribute('y', dragging.origRY + dy);
+      dragging.text.setAttribute('x', dragging.origTX + dx);
+      dragging.text.setAttribute('y', dragging.origTY + dy);
+
+      // Update connected lines
+      const newCX = dragging.nodeCX + dx;
+      const newCY = dragging.nodeCY + dy;
+      const id = dragging.nodeId;
+
+      // Lines TO this node (x2,y2)
+      const lineTo = svg.querySelector(`[data-mm-line="${id}"]`);
+      if (lineTo) {
+        lineTo.setAttribute('x2', newCX);
+        lineTo.setAttribute('y2', newCY);
+      }
+
+      // Lines FROM this node (x1,y1) — branch nodes connect to their children
+      if (id.startsWith('branch-')) {
+        const branchIdx = id.split('-')[1];
+        svg.querySelectorAll(`[data-mm-line^="child-${branchIdx}-"]`).forEach(line => {
+          line.setAttribute('x1', newCX);
+          line.setAttribute('y1', newCY);
+        });
+      }
+    };
+
+    const onMouseUp = (e) => {
+      if (!dragging) return;
+      const cur = toSVG(e.clientX, e.clientY);
+      const newCX = dragging.nodeCX + (cur.x - dragging.start.x);
+      const newCY = dragging.nodeCY + (cur.y - dragging.start.y);
+      dragging.node.style.cursor = 'grab';
+
+      const id = dragging.nodeId;
+      // Emit position patch
+      if (id.startsWith('branch-')) {
+        const idx = parseInt(id.split('-')[1]);
+        this.emitPatch(`branches.${idx}._x`, Math.round(newCX));
+        this.emitPatch(`branches.${idx}._y`, Math.round(newCY));
+      } else if (id.startsWith('child-')) {
+        const parts = id.split('-');
+        const bi = parseInt(parts[1]);
+        const ci = parseInt(parts[2]);
+        const child = this.artifact.data.branches[bi]?.children[ci];
+        if (typeof child === 'string') {
+          // Convert string child to object to store position
+          this.emitPatch(`branches.${bi}.children.${ci}`, { label: child, _x: Math.round(newCX), _y: Math.round(newCY) });
+        } else {
+          this.emitPatch(`branches.${bi}.children.${ci}._x`, Math.round(newCX));
+          this.emitPatch(`branches.${bi}.children.${ci}._y`, Math.round(newCY));
+        }
+      }
+
+      dragging = null;
+    };
+
+    svg.addEventListener('mousedown', onMouseDown);
+    svg.addEventListener('mousemove', onMouseMove);
+    svg.addEventListener('mouseup', onMouseUp);
+    svg.addEventListener('mouseleave', onMouseUp);
+
+    this._listeners.push([svg, 'mousedown', onMouseDown]);
+    this._listeners.push([svg, 'mousemove', onMouseMove]);
+    this._listeners.push([svg, 'mouseup', onMouseUp]);
+    this._listeners.push([svg, 'mouseleave', onMouseUp]);
   }
 
   // Forward data update to iframe if applicable

@@ -484,8 +484,19 @@ textarea.bs-input { resize: vertical; min-height: 48px; line-height: 1.4; }
 
 /* Edit code button for diagram */
 .bs-edit-code-btn { position: absolute; top: 6px; right: 6px; font-size: 10px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; opacity: 0; transition: opacity .15s; z-index: 3; }
-.artifact-body:hover .bs-edit-code-btn { opacity: 0.7; }
+.artifact-body:hover .bs-edit-code-btn, .expand-content:hover .bs-edit-code-btn { opacity: 0.7; }
 .bs-edit-code-btn:hover { opacity: 1 !important; color: var(--accent); border-color: var(--accent); }
+
+/* Diagram code overlay */
+.bs-code-overlay { position: absolute; inset: 0; background: var(--surface); border-radius: 8px; flex-direction: column; z-index: 10; padding: 12px; }
+.bs-code-textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace; font-size: 12px; line-height: 1.5; padding: 12px; resize: none; outline: none; }
+.bs-code-textarea:focus { border-color: var(--accent); }
+.bs-code-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
+/* Mindmap draggable nodes */
+.bs-mm-draggable { cursor: grab; }
+.bs-mm-draggable:active { cursor: grabbing; }
+.bs-mm-draggable:hover rect { filter: brightness(1.2); }
 
 /* Presentation add slide button */
 .bs-add-slide-btn { font-size: 12px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--text2); cursor: pointer; margin-left: 8px; }

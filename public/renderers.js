@@ -36,54 +36,68 @@ function renderMindMap(data, container) {
     return;
   }
 
-  const W = 460, H = Math.max(250, data.branches.length * 50);
+  const branches = data.branches || [];
+  const W = 460, H = Math.max(280, branches.length * 55 + 60);
   const cx = W / 2, cy = H / 2;
+  const branchRadius = Math.min(W, H) * 0.32;
+  const angleStep = (2 * Math.PI) / Math.max(branches.length, 1);
 
   let svg = `<svg class="mindmap-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
 
-  const branches = data.branches || [];
-  const angleStep = (2 * Math.PI) / Math.max(branches.length, 1);
-  const branchRadius = Math.min(W, H) * 0.32;
-
+  // Lines layer (drawn first, behind nodes)
   branches.forEach((branch, i) => {
     const angle = angleStep * i - Math.PI / 2;
-    const bx = cx + Math.cos(angle) * branchRadius;
-    const by = cy + Math.sin(angle) * branchRadius;
+    const bx = branch._x != null ? branch._x : cx + Math.cos(angle) * branchRadius;
+    const by = branch._y != null ? branch._y : cy + Math.sin(angle) * branchRadius;
+    svg += `<line class="edge" data-mm-line="branch-${i}" x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}"/>`;
 
-    svg += `<line class="edge" x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}"/>`;
-
-    const bLabel = (branch.label || '').substring(0, 25);
-    const bw = Math.max(80, bLabel.length * 7 + 20);
-
-    // Branch node group with delete
-    svg += `<g data-delete="branches.${i}" class="bs-node-group">`;
-    svg += `<rect class="node-branch" x="${bx - bw/2}" y="${by - 14}" width="${bw}" height="28" rx="14"/>`;
-    svg += `<text data-edit="branches.${i}.label" x="${bx}" y="${by + 4}" text-anchor="middle" font-size="11">${escapeHtml(bLabel)}</text>`;
-    svg += `</g>`;
-
-    // Children
     const children = branch.children || [];
     const childAngleSpread = 0.6;
     const childRadius = 65;
     children.forEach((child, j) => {
       const childAngle = angle + (j - (children.length - 1) / 2) * (childAngleSpread / Math.max(1, children.length - 1));
-      const chx = bx + Math.cos(childAngle) * childRadius;
-      const chy = by + Math.sin(childAngle) * childRadius;
+      const chObj = typeof child === 'object' ? child : null;
+      const chx = chObj && chObj._x != null ? chObj._x : bx + Math.cos(childAngle) * childRadius;
+      const chy = chObj && chObj._y != null ? chObj._y : by + Math.sin(childAngle) * childRadius;
+      svg += `<line class="edge" data-mm-line="child-${i}-${j}" x1="${bx}" y1="${by}" x2="${chx}" y2="${chy}" opacity="0.5"/>`;
+    });
+  });
 
-      svg += `<line class="edge" x1="${bx}" y1="${by}" x2="${chx}" y2="${chy}" opacity="0.5"/>`;
+  // Nodes layer
+  branches.forEach((branch, i) => {
+    const angle = angleStep * i - Math.PI / 2;
+    const bx = branch._x != null ? branch._x : cx + Math.cos(angle) * branchRadius;
+    const by = branch._y != null ? branch._y : cy + Math.sin(angle) * branchRadius;
 
+    const bLabel = (branch.label || '').substring(0, 25);
+    const bw = Math.max(80, bLabel.length * 7 + 20);
+
+    svg += `<g data-delete="branches.${i}" data-mm-node="branch-${i}" data-mm-idx="${i}" class="bs-node-group bs-mm-draggable" style="cursor:grab;">`;
+    svg += `<rect class="node-branch" x="${bx - bw/2}" y="${by - 14}" width="${bw}" height="28" rx="14"/>`;
+    svg += `<text data-edit="branches.${i}.label" x="${bx}" y="${by + 4}" text-anchor="middle" font-size="11">${escapeHtml(bLabel)}</text>`;
+    svg += `</g>`;
+
+    const children = branch.children || [];
+    const childAngleSpread = 0.6;
+    const childRadius = 65;
+    children.forEach((child, j) => {
+      const childAngle = angle + (j - (children.length - 1) / 2) * (childAngleSpread / Math.max(1, children.length - 1));
       const isString = typeof child === 'string';
+      const chObj = isString ? null : child;
+      const chx = chObj && chObj._x != null ? chObj._x : bx + Math.cos(childAngle) * childRadius;
+      const chy = chObj && chObj._y != null ? chObj._y : by + Math.sin(childAngle) * childRadius;
+
       const cLabel = (isString ? child : child.label || '').substring(0, 20);
       const cw = Math.max(60, cLabel.length * 6.5 + 16);
       const editPath = isString ? `branches.${i}.children.${j}` : `branches.${i}.children.${j}.label`;
 
-      svg += `<g data-delete="branches.${i}.children.${j}" class="bs-node-group">`;
+      svg += `<g data-delete="branches.${i}.children.${j}" data-mm-node="child-${i}-${j}" data-mm-branch="${i}" data-mm-child="${j}" class="bs-node-group bs-mm-draggable" style="cursor:grab;">`;
       svg += `<rect class="node-child" x="${chx - cw/2}" y="${chy - 10}" width="${cw}" height="20" rx="10"/>`;
       svg += `<text data-edit="${editPath}" x="${chx}" y="${chy + 3}" text-anchor="middle" font-size="9.5">${escapeHtml(cLabel)}</text>`;
       svg += `</g>`;
     });
 
-    // Add child button (small "+" near last child position)
+    // Add child button
     const addAngle = angle + ((children.length) - (children.length - 1) / 2) * (childAngleSpread / Math.max(1, children.length));
     const addX = bx + Math.cos(addAngle) * childRadius;
     const addY = by + Math.sin(addAngle) * childRadius;
@@ -93,7 +107,7 @@ function renderMindMap(data, container) {
     svg += `</g>`;
   });
 
-  // Center node
+  // Center node (on top)
   const centerLabel = (data.center || '').substring(0, 30);
   const centerW = Math.max(100, centerLabel.length * 8 + 24);
   svg += `<rect class="node-center" x="${cx - centerW/2}" y="${cy - 16}" width="${centerW}" height="32" rx="16"/>`;
@@ -101,7 +115,6 @@ function renderMindMap(data, container) {
 
   svg += '</svg>';
 
-  // Add branch button (outside SVG)
   const addBranchHTML = `<div data-add="branches" data-add-template='${escapeHtml(JSON.stringify({label:"New Branch",children:[]}))}' class="bs-add-zone" title="Add branch">+ Add branch</div>`;
 
   container.innerHTML = svg + addBranchHTML;
@@ -215,9 +228,43 @@ function renderDiagram(data, container) {
 
   const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
   container.innerHTML = `
-    <div class="diagram-container" id="${id}">${escapeHtml(data.mermaid)}</div>
-    <button class="bs-edit-code-btn" data-edit-multiline="mermaid" title="Edit diagram source">Edit Code</button>
+    <div class="diagram-wrapper" style="position:relative;">
+      <div class="diagram-container" id="${id}">${escapeHtml(data.mermaid)}</div>
+      <button class="bs-edit-code-btn" title="Edit diagram source">Edit Code</button>
+      <div class="bs-code-overlay" style="display:none;">
+        <textarea class="bs-code-textarea" spellcheck="false">${escapeHtml(data.mermaid)}</textarea>
+        <div class="bs-code-actions">
+          <button class="btn bs-code-cancel">Cancel</button>
+          <button class="btn btn-primary bs-code-save">Save</button>
+        </div>
+      </div>
+    </div>
   `;
+
+  // Edit code button opens overlay
+  const editBtn = container.querySelector('.bs-edit-code-btn');
+  const overlay = container.querySelector('.bs-code-overlay');
+  const textarea = container.querySelector('.bs-code-textarea');
+  const cancelBtn = container.querySelector('.bs-code-cancel');
+  const saveBtn = container.querySelector('.bs-code-save');
+
+  editBtn.onclick = (e) => {
+    e.stopPropagation();
+    textarea.value = data.mermaid;
+    overlay.style.display = 'flex';
+    textarea.focus();
+  };
+  cancelBtn.onclick = (e) => { e.stopPropagation(); overlay.style.display = 'none'; };
+  saveBtn.onclick = (e) => {
+    e.stopPropagation();
+    overlay.style.display = 'none';
+    // Dispatch custom event for InteractiveEngine to pick up
+    container.dispatchEvent(new CustomEvent('bs-mermaid-save', { bubbles: true, detail: { value: textarea.value } }));
+  };
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); overlay.style.display = 'none'; }
+    if (e.key === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveBtn.click(); }
+  });
 
   if (window.mermaid) {
     try {
