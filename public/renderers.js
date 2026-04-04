@@ -180,9 +180,15 @@ function renderDiagram(data, container) {
   if (window.mermaid) {
     try {
       window.mermaid.render(id + '-svg', data.mermaid).then(({ svg }) => {
-        container.querySelector('.diagram-container').innerHTML = svg;
+        // Guard: check container is still in the DOM before updating
+        const target = container.querySelector('.diagram-container');
+        if (target && document.contains(container)) {
+          target.innerHTML = svg;
+        }
       }).catch(() => {
-        container.innerHTML = `<pre style="font-size:11px;color:var(--text2);padding:10px;white-space:pre-wrap;">${escapeHtml(data.mermaid)}</pre>`;
+        if (document.contains(container)) {
+          container.innerHTML = `<pre style="font-size:11px;color:var(--text2);padding:10px;white-space:pre-wrap;">${escapeHtml(data.mermaid)}</pre>`;
+        }
       });
     } catch {
       container.innerHTML = `<pre style="font-size:11px;color:var(--text2);padding:10px;white-space:pre-wrap;">${escapeHtml(data.mermaid)}</pre>`;
@@ -239,7 +245,7 @@ function renderFreeform(data, container) {
   // Error boundary: show fallback if iframe fails to render content
   const errorTimeout = setTimeout(() => {
     try {
-      if (!iframe.contentDocument || !iframe.contentDocument.body || iframe.contentDocument.body.innerHTML.length < 10) {
+      if (document.contains(wrapper) && (!iframe.contentDocument || !iframe.contentDocument.body || iframe.contentDocument.body.innerHTML.length < 10)) {
         wrapper.innerHTML = '<div style="color:var(--text2);padding:20px;">Visualization failed to render.</div>';
       }
     } catch {}

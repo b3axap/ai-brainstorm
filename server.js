@@ -46,7 +46,7 @@ const COLORS = ['#6c5ce7', '#00cec9', '#fdcb6e', '#fd79a8', '#74b9ff', '#ff6b6b'
 // --- Context builder: uses per-user chat history ---
 function buildContext(room, socketId) {
   const userNames = room.users.map(u => u.name).join(', ') || 'none';
-  const artifactList = room.artifacts.map(a => `- [${a.type}] "${a.title}" by ${a.author}`).join('\n') || 'none yet';
+  const artifactList = room.artifacts.map(a => `- [${a.type}] "${a.title}" (id:${a.id}) by ${a.author}`).join('\n') || 'none yet';
 
   const systemBase = `You are an AI brainstorming partner in a collaborative room.
 Room ID: ${room.id}
@@ -114,13 +114,21 @@ In the JSON block:
     phasePrompt = `The mandatory discovery phase is complete. You are now in FREE BRAINSTORM mode.
 Respond naturally. Help develop the idea further. You may ask 0-3 follow-up questions if something new comes up.
 
-${shouldOfferCanvas ? 'IMPORTANT: Include "offer_canvas": true in the JSON to show the user a "Generate to Canvas" button with visualization options.' : ''}
+${shouldOfferCanvas ? 'IMPORTANT: Include "offer_canvas": true and "suggest": [...] in the JSON.' : ''}
 
-In the JSON block, always include:
-- "suggest": array of 2-3 best visualization types for this idea
-- "questions": optional array of 0-3 question objects (only if genuinely needed)
-${shouldOfferCanvas ? '- "offer_canvas": true' : ''}
-- "phase": "free"`;
+CANVAS COMMANDS:
+When the user's message CLEARLY intends to create, update, or transform a visualization, include "canvas_action" in your JSON.
+Examples:
+- "make a mindmap of this" → canvas_action: {"intent":"create", "artifact_type":"mindmap"}
+- "add a marketing branch to the mindmap" → canvas_action: {"intent":"update", "target_id":"<id>", "instruction":"add marketing branch"}
+- "convert the table to a presentation" → canvas_action: {"intent":"transform", "target_id":"<id>", "artifact_type":"presentation"}
+ONLY include canvas_action when the intent is UNAMBIGUOUS. Normal discussion does NOT get canvas_action.
+
+In the JSON block:
+- "phase": "free"
+- "questions": optional 0-3 question objects
+${shouldOfferCanvas ? '- "suggest": array of 2-3 agent IDs\n- "offer_canvas": true' : '- Do NOT include "suggest" unless you also include canvas_action or offer_canvas'}
+- "canvas_action": optional — only when the user clearly wants to affect the canvas`;
   }
 
   const systemPrompt = `${systemBase}
@@ -195,6 +203,7 @@ Rules:
     let clarifyQuestions = [];
     let phase = '';
     let offerCanvas = false;
+    let canvasAction = null;
 
     // Try to find any JSON block at the end of the response
     const jsonMatch = fullResponse.match(/\{[\s\S]*"phase"\s*:[\s\S]*\}$/m)
@@ -206,6 +215,7 @@ Rules:
         clarifyQuestions = parsed.questions || [];
         phase = parsed.phase || '';
         offerCanvas = parsed.offer_canvas || false;
+        canvasAction = parsed.canvas_action || null;
       } catch (e) { /* ignore parse error */ }
     }
 
@@ -258,7 +268,8 @@ Rules:
       suggestedTypes: suggestedTypes,
       clarifyQuestions: clarifyQuestions,
       phase: phase,
-      offerCanvas: offerCanvas
+      offerCanvas: offerCanvas,
+      canvasAction: canvasAction
     });
 
   } catch (error) {
@@ -277,8 +288,106 @@ Rules:
   }
 }
 
+// --- Artifact manipulation: expand, transform, ask ---
+
+async function handleArtifactExpand(room, artifact, socket) {
+  const agent = getAgent(artifact.type);
+  if (!agent) return;
+
+  const { systemBase } = buildContext(room, socket.id);
+  const system = `${systemBase}\n\n${agent.systemPrompt}\n\nYou are given an existing ${artifact.type} visualization. EXPAND it with significantly more detail, depth, and sub-items. Keep the same JSON structure but make it richer.\n\nExisting data:\n${JSON.stringify(artifact.data, null, 2)}\n\nReturn the COMPLETE updated JSON (not just the additions).`;
+
+  const response = await getAnthropicClient().messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 3000,
+    system: system,
+    messages: [{ role: 'user', content: 'Expand this visualization with more detail.' }]
+  });
+
+  const text = response.content[0].text;
+  let data;
+  try { data = JSON.parse(text); } catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    data = m ? JSON.parse(m[0]) : null;
+  }
+  if (!data) throw new Error('Failed to parse expanded data');
+
+  artifact.data = data;
+  artifact.title = data.title || data.center || artifact.title;
+  io.to(room.id).emit('artifact-updated', {
+    roomId: room.id, artifactId: artifact.id, data: artifact.data, title: artifact.title
+  });
+}
+
+async function handleArtifactTransform(room, artifact, targetType, socket) {
+  const agent = getAgent(targetType);
+  if (!agent) return;
+
+  const { systemBase } = buildContext(room, socket.id);
+  const system = `${systemBase}\n\n${agent.systemPrompt}\n\nYou are converting an existing ${artifact.type} visualization into a ${targetType}. Use all the information from the source data below to create the best possible ${targetType}.\n\nSource data:\n${JSON.stringify(artifact.data, null, 2)}`;
+
+  const response = await getAnthropicClient().messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 3000,
+    system: system,
+    messages: [{ role: 'user', content: `Convert this ${artifact.type} into a ${targetType}.` }]
+  });
+
+  const text = response.content[0].text;
+  let data;
+  try { data = JSON.parse(text); } catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    data = m ? JSON.parse(m[0]) : null;
+  }
+  if (!data) throw new Error('Failed to parse transformed data');
+
+  const newArtifact = {
+    id: generateId(),
+    type: agent.id,
+    title: data.title || data.center || agent.name + ' visualization',
+    data: data,
+    author: socket.userName,
+    renderer: agent.renderer,
+    icon: agent.icon,
+    timestamp: Date.now(),
+    position: { x: (artifact.position?.x || 50) + 40, y: (artifact.position?.y || 50) + 40 }
+  };
+
+  room.artifacts.push(newArtifact);
+  io.to(room.id).emit('artifact-created', { roomId: room.id, artifact: newArtifact });
+}
+
+async function handleArtifactAsk(room, artifact, question, socket) {
+  const agent = getAgent(artifact.type);
+  if (!agent) return;
+
+  const { systemBase } = buildContext(room, socket.id);
+  const system = `${systemBase}\n\n${agent.systemPrompt}\n\nYou are modifying an existing ${artifact.type} visualization based on a user's request. Apply the requested changes and return the COMPLETE updated JSON.\n\nCurrent data:\n${JSON.stringify(artifact.data, null, 2)}`;
+
+  const response = await getAnthropicClient().messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 3000,
+    system: system,
+    messages: [{ role: 'user', content: question }]
+  });
+
+  const text = response.content[0].text;
+  let data;
+  try { data = JSON.parse(text); } catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    data = m ? JSON.parse(m[0]) : null;
+  }
+  if (!data) throw new Error('Failed to parse updated data');
+
+  artifact.data = data;
+  artifact.title = data.title || data.center || artifact.title;
+  io.to(room.id).emit('artifact-updated', {
+    roomId: room.id, artifactId: artifact.id, data: artifact.data, title: artifact.title
+  });
+}
+
 // --- Artifact generation ---
-async function handleArtifactGeneration(room, type, userName, socket) {
+async function handleArtifactGeneration(room, type, userName, socket, referenceIds, customPrompt) {
   const agent = getAgent(type);
   if (!agent) {
     socket.emit('generation-error', { roomId: room.id, message: `Unknown agent type: ${type}` });
@@ -333,7 +442,18 @@ async function handleArtifactGeneration(room, type, userName, socket) {
 
   // Claude-based agents
   const { systemBase, messages } = buildContext(room, socket.id);
-  const fullSystem = `${systemBase}\n\n${agent.systemPrompt}`;
+  let fullSystem = `${systemBase}\n\n${agent.systemPrompt}`;
+
+  // Inject reference artifact data if provided
+  if (referenceIds && referenceIds.length > 0) {
+    const refs = referenceIds
+      .map(id => room.artifacts.find(a => a.id === id))
+      .filter(Boolean)
+      .map(a => `[${a.type}] "${a.title}":\n${JSON.stringify(a.data, null, 2)}`)
+      .join('\n\n');
+    if (refs) fullSystem += `\n\nREFERENCE ARTIFACTS (use this data as context):\n${refs}`;
+  }
+  if (customPrompt) fullSystem += `\n\nADDITIONAL USER INSTRUCTIONS: ${customPrompt}`;
 
   try {
     const response = await getAnthropicClient().messages.create({
@@ -503,10 +623,10 @@ io.on('connection', (socket) => {
     handleChatAnalysis(room, socket);
   });
 
-  socket.on('generate-artifact', ({ roomId, type }) => {
+  socket.on('generate-artifact', ({ roomId, type, referenceIds, customPrompt }) => {
     const room = rooms[roomId];
     if (!room) return;
-    handleArtifactGeneration(room, type, socket.userName, socket);
+    handleArtifactGeneration(room, type, socket.userName, socket, referenceIds, customPrompt);
   });
 
   socket.on('move-artifact', ({ roomId, artifactId, position }) => {
@@ -517,22 +637,74 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('artifact-moved', { artifactId, position });
   });
 
-  socket.on('canvas-message', ({ roomId, content }) => {
+  // --- Artifact actions: expand, transform, ask ---
+  socket.on('artifact-action', async ({ roomId, artifactId, action, payload }) => {
     const room = rooms[roomId];
     if (!room) return;
+    const artifact = room.artifacts.find(a => a.id === artifactId);
+    if (!artifact) return;
 
-    const message = {
-      id: generateId(),
-      role: 'user',
-      content: content,
-      userName: socket.userName,
-      timestamp: Date.now()
-    };
-    // Add to personal chat context so Claude sees it
-    const userChat = room.userChats[socket.id];
-    if (userChat) userChat.messages.push(message);
-    room.messages.push(message);
-    io.to(roomId).emit('sidebar-message', { message });
+    try {
+      if (action === 'expand') {
+        await handleArtifactExpand(room, artifact, socket);
+      } else if (action === 'transform' && payload && payload.targetType) {
+        await handleArtifactTransform(room, artifact, payload.targetType, socket);
+      } else if (action === 'ask' && payload && payload.question) {
+        await handleArtifactAsk(room, artifact, payload.question, socket);
+      }
+    } catch (error) {
+      console.error(`Artifact action ${action} error:`, error.message);
+      socket.emit('generation-error', { roomId, message: error.message });
+    }
+  });
+
+  // --- Artifact data patches (inline edits) ---
+  socket.on('artifact-data-patch', ({ roomId, artifactId, patch }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const artifact = room.artifacts.find(a => a.id === artifactId);
+    if (!artifact || !patch) return;
+
+    // Apply simple path-based patch: e.g. {path: 'branches.0.label', value: 'New'}
+    try {
+      const parts = patch.path.replace(/\[(\d+)\]/g, '.$1').split('.');
+      let obj = artifact.data;
+      for (let i = 0; i < parts.length - 1; i++) {
+        obj = obj[parts[i]];
+      }
+      obj[parts[parts.length - 1]] = patch.value;
+    } catch (e) {
+      console.error('Patch apply error:', e.message);
+      return;
+    }
+
+    io.to(roomId).emit('artifact-updated', {
+      roomId, artifactId, data: artifact.data, title: artifact.title
+    });
+  });
+
+  // --- Execute canvas action from Claude's suggestion ---
+  socket.on('execute-canvas-action', async ({ roomId, canvasAction }) => {
+    const room = rooms[roomId];
+    if (!room || !canvasAction) return;
+
+    try {
+      if (canvasAction.intent === 'create' && canvasAction.artifact_type) {
+        await handleArtifactGeneration(room, canvasAction.artifact_type, socket.userName, socket);
+      } else if (canvasAction.intent === 'update' && canvasAction.target_id) {
+        const artifact = room.artifacts.find(a => a.id === canvasAction.target_id);
+        if (artifact) {
+          await handleArtifactAsk(room, artifact, canvasAction.instruction || 'expand and improve', socket);
+        }
+      } else if (canvasAction.intent === 'transform' && canvasAction.target_id && canvasAction.artifact_type) {
+        const artifact = room.artifacts.find(a => a.id === canvasAction.target_id);
+        if (artifact) {
+          await handleArtifactTransform(room, artifact, canvasAction.artifact_type, socket);
+        }
+      }
+    } catch (error) {
+      socket.emit('generation-error', { roomId, message: error.message });
+    }
   });
 
   socket.on('disconnect', () => {

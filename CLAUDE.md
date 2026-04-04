@@ -10,6 +10,8 @@ A collaborative brainstorming web app where users describe ideas in a chat with 
 
 **Core concept: "Interpreter Agents"** — each agent is a JSON file in `agents/` that defines a specialized prompt for Claude to generate a specific type of visualization. Adding a new agent = adding a new JSON file + a renderer function + CSS.
 
+**Layout:** Split-view workspace — chat panel (left, resizable ~350px) + canvas panel (right) displayed simultaneously. Mobile (<768px): bottom tab bar switches between panels.
+
 ## File Structure
 
 ```
@@ -18,33 +20,34 @@ agents.js          — Loads all JSON agent files from agents/ directory at star
 agents/            — One JSON file per interpreter agent (15 agents total)
 agents/_schema.json — JSON Schema for validating agent files
 public/
-  index.html       — SPA: landing, chat, canvas screens (display:none switching)
-  app.js           — Client logic: Socket.IO, state, screen transitions, UI events
-  style.css        — Dark theme, artifact cards, all renderer styles
+  index.html       — SPA: landing + workspace split-view (display:none switching)
+  app.js           — Client logic: Socket.IO, state, resize handle, @ mentions, viz picker
+  style.css        — Dark theme, split-view grid, artifact cards, all renderer styles
   renderers.js     — Artifact rendering functions (15 renderers)
+  interactive.js   — InteractiveLayer class: action bar (Expand/Transform/Ask) + inline editing for mindmap, table, checklist, kanban
 ```
 
 ## Agent Catalog (15 agents)
 
 ### When to suggest each visualization
 
-| Agent | ID | Icon | Best For | Trigger Keywords |
-|-------|-----|------|----------|-----------------|
-| **Mind Map** | `mindmap` | 🧠 | Idea breakdown, brainstorming, concept overview | structure, breakdown, brainstorm, overview, map |
-| **Table** | `table` | 📊 | Comparing options, structured analysis | compare, vs, analysis, criteria, options |
-| **Presentation** | `presentation` | 🎬 | Pitching ideas, stakeholder narratives | pitch, slides, present, explain, story |
-| **Diagram** | `diagram` | 🔀 | Process flows, architecture, sequences | flow, process, architecture, pipeline, steps |
-| **HTML Guide** | `html_guide` | 📖 | Tutorials, documentation, how-to guides | guide, tutorial, howto, documentation |
-| **Image** | `image` | 🎨 | Visual illustrations (placeholder API) | image, picture, visual, illustration |
-| **Freeform** | `freeform` | ✨ | Creative HTML visualizations, surprise me | anything, creative, surprise, best, auto |
-| **Timeline** | `timeline` | 📅 | Roadmaps, milestones, chronological plans | timeline, roadmap, milestones, schedule, phases |
-| **SWOT Analysis** | `swot` | ⚡ | Strategic analysis, evaluation | swot, strengths, weaknesses, strategic, evaluate |
-| **Kanban Board** | `kanban` | 📋 | Task organization, status tracking | kanban, tasks, board, organize, status, backlog |
-| **Pros & Cons** | `pros_cons` | ⚖️ | Binary comparison, tradeoff analysis | pros, cons, tradeoffs, advantages, drawbacks |
-| **Priority Matrix** | `matrix` | 🎯 | Effort/impact prioritization, 2x2 grids | priority, prioritize, matrix, effort, impact |
-| **Checklist** | `checklist` | ✅ | Action items, step-by-step task lists | checklist, action items, steps, todo, launch |
-| **Donut Chart** | `donut_chart` | 🍩 | Proportions, distribution, composition | chart, pie, donut, distribution, percentage |
-| **Insight Card** | `quote_card` | 💡 | Key takeaways, highlighted insights | insight, quote, takeaway, highlight, summary |
+| Agent | ID | Icon | Best For |
+|-------|-----|------|----------|
+| **Mind Map** | `mindmap` | 🧠 | Idea breakdown, concept overview |
+| **Table** | `table` | 📊 | Comparing options, structured analysis |
+| **Presentation** | `presentation` | 🎬 | Pitching ideas, narratives |
+| **Diagram** | `diagram` | 🔀 | Process flows, architecture |
+| **HTML Guide** | `html_guide` | 📖 | Tutorials, documentation |
+| **Image** | `image` | 🎨 | Visual illustrations (placeholder) |
+| **Freeform** | `freeform` | ✨ | Creative HTML, custom widgets |
+| **Timeline** | `timeline` | 📅 | Roadmaps, milestones |
+| **SWOT Analysis** | `swot` | ⚡ | Strategic analysis |
+| **Kanban Board** | `kanban` | 📋 | Task organization |
+| **Pros & Cons** | `pros_cons` | ⚖️ | Tradeoff analysis |
+| **Priority Matrix** | `matrix` | 🎯 | Effort/impact prioritization |
+| **Checklist** | `checklist` | ✅ | Action items, task lists |
+| **Donut Chart** | `donut_chart` | 🍩 | Proportions, distribution |
+| **Insight Card** | `quote_card` | 💡 | Key takeaways |
 
 ### Agent JSON Output Schemas
 
@@ -59,86 +62,111 @@ public/
 **swot**: `{title, strengths: [], weaknesses: [], opportunities: [], threats: []}`
 **kanban**: `{title, columns: [{name, cards: [{title, tag}]}]}`
 **pros_cons**: `{title, pros: [], cons: [], verdict?}`
-**matrix**: `{title, axisX, axisY, quadrants: [{label, items: []}]}` (order: top-left, top-right, bottom-left, bottom-right)
+**matrix**: `{title, axisX, axisY, quadrants: [{label, items: []}]}`
 **checklist**: `{title, items: [{text, done: bool}]}`
 **donut_chart**: `{title, centerLabel, segments: [{label, value, color}]}`
 **quote_card**: `{quote, author, tag, supporting?}`
 
 ## Data Flow
 
-1. User creates/joins room → `join-room` → server creates room in memory
-2. User sends message → `send-message` → server calls Claude (streaming) → `claude-chunk` → `claude-done` with `suggestedTypes[]`, `clarifyQuestions[]`, `autoGenerate[]`
-3. User picks visualization → `generate-artifact` → server uses agent prompt → Claude generates JSON → `artifact-created` → client renders on canvas
-4. Other users see events in real-time via Socket.IO room broadcast
+1. User creates/joins room → `join-room` → server creates room in memory → workspace split-view appears
+2. User sends message → `send-message` → server calls Claude (streaming) → `claude-chunk` → `claude-done`
+3. Claude may return `canvas_action` in JSON → client shows one-click action button → user confirms → `execute-canvas-action`
+4. User picks visualization from picker modal → `generate-artifact` → server uses agent prompt → Claude generates JSON → `artifact-created` → client renders on canvas
+5. User interacts with artifact → action bar (Expand/Transform/Ask) → `artifact-action` → server calls Claude → `artifact-updated`
+6. User edits inline (mindmap labels, table cells, checklist toggles) → `artifact-data-patch` → server patches data → `artifact-updated` broadcast
 
 ## Key Patterns
 
+### Split-View Workspace
+- CSS Grid: `grid-template-columns: 350px 4px 1fr`
+- Resize handle between chat and canvas panels
+- Mobile (<768px): absolute-positioned panels, bottom tab bar switches via `.show-canvas` class
+
+### Artifact Interaction
+Each artifact card has:
+- **Action bar** (hover): Expand, Transform, Ask buttons
+- **Inline editing** (via InteractiveLayer): double-click to edit mindmap labels, table cells; click to toggle checklist items; drag kanban cards
+- **Ask bar**: mini input at bottom of card for artifact-specific questions
+
+### @ Mentions
+User types `@` in chat → autocomplete dropdown shows artifacts from `state.artifacts` → selecting inserts `@Title`. Server resolves mentions to inject artifact data into Claude's context.
+
+### Canvas Actions (Chat → Canvas)
+Claude can detect canvas intent in messages and return `canvas_action` in JSON response:
+- `{intent: "create", artifact_type: "mindmap"}` — create new artifact
+- `{intent: "update", target_id: "<id>", instruction: "add X"}` — modify existing
+- `{intent: "transform", target_id: "<id>", artifact_type: "presentation"}` — convert type
+
+Client shows a confirmation button; user clicks to execute.
+
 ### Context Management
-Every Claude call includes full room context via `buildContext(room)`:
-- All chat messages (trimmed to first 5 + last 30 if >50)
-- List of existing artifacts (type + title)
+Every Claude call includes full room context via `buildContext(room, socketId)`:
+- Per-user chat messages (trimmed to first 5 + last 30 if >50)
+- List of existing artifacts (type + title + id)
 - List of active users
 
+### Chat Flow Phases
+1. **Mandatory** (first message): Claude asks exactly 4 discovery questions with clickable options
+2. **Mandatory answering**: User answers, Claude continues until all 4 answered
+3. **Mandatory done**: Claude offers canvas visualization (one-time), transitions to free mode
+4. **Free brainstorm**: Open conversation, canvas_action support, suggestions only when contextually obvious
+
 ### Agent System
-Agents are JSON files auto-loaded from `agents/` directory:
-```json
-{
-  "id": "timeline",
-  "name": "Timeline",
-  "icon": "📅",
-  "description": "Chronological roadmap or milestone timeline",
-  "keywords": ["timeline", "roadmap", "milestones"],
-  "renderer": "timeline",
-  "systemPrompt": "...",
-  "outputExample": { ... },
-  "externalAPI": null
-}
-```
+Agents are JSON files auto-loaded from `agents/` directory. Each has: id, name, icon, description, keywords, renderer, systemPrompt, outputExample, externalAPI.
 
 ### Renderer System
-`renderers.js` exports `renderArtifact(type, data, container)`. Each renderer takes parsed JSON from Claude and renders into a DOM container. Renderers are pure functions: SVG, HTML tables, or vanilla DOM — no external dependencies except Mermaid.js for diagrams.
+`renderers.js` exports `renderArtifact(type, data, container)`. Pure functions — SVG, HTML tables, or vanilla DOM. InteractiveLayer wraps rendered content with editing capabilities.
 
 ### Socket.IO Event Contract
 
 **Client → Server:**
 - `join-room { roomId?, userName }` — Create or join room
 - `send-message { roomId, content }` — Chat message → triggers Claude
-- `generate-artifact { roomId, type }` — Generate visualization
+- `generate-artifact { roomId, type, referenceIds?, customPrompt? }` — Generate visualization (optionally referencing other artifacts)
 - `move-artifact { roomId, artifactId, position }` — Drag artifact
-- `canvas-message { roomId, content }` — Mini-chat on canvas
+- `artifact-action { roomId, artifactId, action: 'expand'|'transform'|'ask', payload? }` — Artifact manipulation
+- `artifact-data-patch { roomId, artifactId, patch: {path, value} }` — Inline edit
+- `execute-canvas-action { roomId, canvasAction }` — Execute Claude's suggested canvas action
 
 **Server → Client:**
-- `room-joined { room, user }` — Full room state
+- `room-joined { room, user }` — Full room state (personal chat + shared artifacts)
 - `user-joined / user-left` — Presence updates
-- `new-message { message }` — Chat message broadcast
+- `new-message { message }` — Chat message
 - `claude-chunk { chunk }` — Streaming token
-- `claude-done { fullMessage, suggestedTypes, clarifyQuestions, autoGenerate, confidence, reasoning }` — Final response + ranked suggestions with confidence
+- `claude-done { fullMessage, suggestedTypes, clarifyQuestions, phase, offerCanvas, canvasAction }` — Final response
 - `artifact-created { artifact }` — New artifact for canvas
+- `artifact-updated { artifactId, data, title }` — Updated artifact (re-render)
 - `artifact-moved { artifactId, position }` — Position sync
+- `generation-error { message }` — Error notification
 
 ## In-Memory Data Model
 
 ```js
 rooms[roomId] = {
-  id: string,           // 6-char alphanumeric
-  messages: [{
-    id, role, content, userName, timestamp
-  }],
+  id: string,
+  messages: [],         // shared activity log (capped at 200)
   artifacts: [{
     id, type, title, data, author, renderer, icon, timestamp,
     position: { x, y }
   }],
-  users: [{ socketId, name, color }]
+  users: [{ socketId, name, color }],
+  userChats: {          // per-user private chat
+    [socketId]: {
+      messages: [],     // capped at 200
+      phase: { mandatoryDone, mandatoryDoneAtMsg, msgCount }
+    }
+  }
 }
 ```
 
 ## Adding a New Agent
 
 1. Create `agents/your_agent.json` following `agents/_schema.json`
-2. Add `renderYourAgent(data, container)` to `public/renderers.js` and register it in the `renderers` object
+2. Add `renderYourAgent(data, container)` to `public/renderers.js` and register in the `renderers` object
 3. Add CSS styles for your renderer in `public/style.css`
-4. If your agent calls an external API, handle it in `server.js:handleArtifactGeneration()` under `if (agent.externalAPI)`
-5. Restart server. The agent auto-loads and appears in Chat suggestions + Canvas "New Idea" modal
+4. Optionally add interactive editing support in `public/interactive.js`
+5. Restart server. The agent auto-loads and appears in the visualization picker.
 
 ## Running Locally
 
@@ -166,7 +194,13 @@ All renderers use CSS variables for theming:
 --blue: #74b9ff      --text: #e4e7f0         --text2: #8b90a0
 ```
 
-Figma reference: "AI Brainstorm — Visualization Examples" contains mockups for all 12 core visualization types.
+## Concurrency Model
+
+- **Per-socket request lock**: only one Claude stream per user at a time
+- **AbortController per stream**: in-flight calls aborted on disconnect
+- **Duplicate user prevention**: `join-room` checks existing socketId
+- **Message cap**: both shared and per-user histories trimmed to 200
+- **Room cleanup**: cancellable 5-min timer for empty rooms
 
 ## Current Limitations (MVP)
 
@@ -174,5 +208,6 @@ Figma reference: "AI Brainstorm — Visualization Examples" contains mockups for
 - No authentication (room code = access)
 - No persistent history
 - No live cursors
-- Image agent is a placeholder (no actual generation API connected)
+- Image agent is a placeholder
 - No artifact versioning/forking
+- Kanban drag-and-drop is visual-only (no server-side reorder)

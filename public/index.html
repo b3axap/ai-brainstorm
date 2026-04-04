@@ -32,56 +32,49 @@
   </div>
 </div>
 
-<!-- SCREEN 2: CHAT -->
-<div id="chat" class="screen">
-  <div class="chat-header">
-    <span class="room-code" id="chatRoomCode" title="Click to copy">---</span>
-    <span class="users-list" id="chatUsers"></span>
+<!-- SCREEN 2: WORKSPACE (chat + canvas split-view) -->
+<div id="workspace" class="screen">
+  <div class="workspace-header">
+    <span class="room-code" id="roomCode" title="Click to copy">---</span>
+    <span class="users-list" id="usersList"></span>
     <span class="spacer"></span>
-    <button class="btn" id="goCanvasBtn">Canvas →</button>
+    <button class="btn" id="newVizBtn">+ New Visualization</button>
   </div>
 
-  <div class="chat-messages" id="chatMessages">
-    <div class="message assistant">
-      <div class="msg-header"><span class="name">Claude</span></div>
-      <div class="msg-bubble">Welcome! Describe your idea and I'll help you brainstorm and visualize it. 🧠</div>
-    </div>
-  </div>
-
-  <div class="typing-indicator" id="typingIndicator">✨ Claude is thinking...</div>
-
-  <div class="chat-input">
-    <input class="input" id="chatInput" type="text" placeholder="Describe your idea..." autocomplete="off">
-    <button class="btn btn-primary" id="chatSendBtn">Send</button>
-  </div>
-</div>
-
-<!-- SCREEN 3: CANVAS -->
-<div id="canvas" class="screen">
-  <div class="canvas-header">
-    <button class="btn" id="goChatBtn">← Chat</button>
-    <span class="room-code" id="canvasRoomCode">---</span>
-    <span class="users-list" id="canvasUsers"></span>
-    <span class="spacer"></span>
-    <button class="btn" id="newIdeaBtn">+ New Idea</button>
-  </div>
-
-  <div class="canvas-body">
-    <div class="canvas-area" id="canvasArea">
-      <div class="canvas-grid"></div>
-      <div class="canvas-content" id="canvasContent">
-        <!-- Artifact cards rendered here -->
+  <div class="workspace-body" id="workspaceBody">
+    <!-- LEFT: Chat Panel -->
+    <div class="chat-panel" id="chatPanel">
+      <div class="chat-messages" id="chatMessages">
+        <div class="message assistant">
+          <div class="msg-header"><span class="name">Claude</span></div>
+          <div class="msg-bubble">Welcome! Describe your idea and I'll help you brainstorm and visualize it. 🧠</div>
+        </div>
+      </div>
+      <div class="typing-indicator" id="typingIndicator">✨ Claude is thinking...</div>
+      <div class="chat-input">
+        <input class="input" id="chatInput" type="text" placeholder="Describe your idea..." autocomplete="off">
+        <button class="btn btn-primary" id="chatSendBtn">Send</button>
       </div>
     </div>
 
-    <div class="canvas-sidebar">
-      <div class="sidebar-header">💬 Chat</div>
-      <div class="sidebar-messages" id="sidebarMessages"></div>
-      <div class="sidebar-input">
-        <input class="input" id="sidebarInput" type="text" placeholder="Message..." autocomplete="off">
-        <button class="btn" id="sidebarSendBtn">Send</button>
+    <!-- RESIZE HANDLE -->
+    <div class="resize-handle" id="resizeHandle"></div>
+
+    <!-- RIGHT: Canvas Panel -->
+    <div class="canvas-panel" id="canvasPanel">
+      <div class="canvas-area" id="canvasArea">
+        <div class="canvas-grid"></div>
+        <div class="canvas-content" id="canvasContent">
+          <!-- Artifact cards rendered here -->
+        </div>
       </div>
     </div>
+  </div>
+
+  <!-- Mobile bottom tabs -->
+  <div class="mobile-tabs" id="mobileTabs">
+    <button class="mobile-tab active" id="mobileTabChat">💬 Chat</button>
+    <button class="mobile-tab" id="mobileTabCanvas">🎨 Canvas</button>
   </div>
 </div>
 
@@ -93,6 +86,12 @@
 
     <div class="viz-grid" id="vizGrid">
       <!-- Populated by JS: agent cards with checkboxes -->
+    </div>
+
+    <!-- Reference existing artifacts -->
+    <div class="viz-references" id="vizReferences" style="display:none;">
+      <div class="viz-section-label">📎 Reference existing artifacts</div>
+      <div class="viz-ref-grid" id="vizRefGrid"></div>
     </div>
 
     <div class="viz-custom">
@@ -113,9 +112,13 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- Mention autocomplete dropdown -->
+<div class="mention-dropdown" id="mentionDropdown"></div>
+
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script src="renderers.js"></script>
+<script src="interactive.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

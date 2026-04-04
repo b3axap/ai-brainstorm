@@ -45,13 +45,38 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .join-row .input { flex: 1; text-transform: uppercase; letter-spacing: 2px; text-align: center; font-weight: 600; }
 .error-msg { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
 
-/* --- CHAT --- */
-#chat { flex-direction: column; }
-.chat-header { height: 52px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0; }
-.chat-header .room-code { font-size: 12px; color: var(--text2); background: var(--surface2); padding: 4px 10px; border-radius: 6px; font-family: monospace; letter-spacing: 1px; cursor: pointer; }
-.chat-header .room-code:hover { color: var(--accent2); }
-.chat-header .users-list { font-size: 12px; color: var(--text2); }
-.chat-header .spacer { flex: 1; }
+/* --- WORKSPACE (split-view) --- */
+#workspace { flex-direction: column; }
+.workspace-header { height: 48px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0; }
+.workspace-header .room-code { font-size: 12px; color: var(--text2); background: var(--surface2); padding: 4px 10px; border-radius: 6px; font-family: monospace; letter-spacing: 1px; cursor: pointer; }
+.workspace-header .room-code:hover { color: var(--accent2); }
+.workspace-header .users-list { font-size: 12px; color: var(--text2); }
+.spacer { flex: 1; }
+.workspace-body { flex: 1; display: grid; grid-template-columns: 350px 4px 1fr; overflow: hidden; }
+.chat-panel { display: flex; flex-direction: column; overflow: hidden; min-width: 280px; background: var(--surface); border-right: none; }
+.resize-handle { background: var(--border); cursor: col-resize; transition: background .15s; z-index: 20; }
+.resize-handle:hover, .resize-handle.active { background: var(--accent); }
+.canvas-panel { position: relative; overflow: auto; background: var(--bg); }
+.canvas-area { position: relative; width: 4000px; height: 4000px; }
+.canvas-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, #2a2f3d 1px, transparent 1px); background-size: 24px 24px; }
+.canvas-content { position: absolute; inset: 0; }
+
+/* Mobile tabs */
+.mobile-tabs { display: none; height: 48px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
+.mobile-tab { flex: 1; background: none; border: none; color: var(--text2); font-size: 13px; cursor: pointer; font-family: inherit; transition: color .15s; }
+.mobile-tab.active { color: var(--accent2); font-weight: 600; }
+
+@media (max-width: 768px) {
+  .workspace-body { grid-template-columns: 1fr; position: relative; }
+  .chat-panel { position: absolute; inset: 0; z-index: 10; transition: transform .3s ease; }
+  .resize-handle { display: none; }
+  .canvas-panel { position: absolute; inset: 0; z-index: 5; }
+  .workspace-body.show-canvas .chat-panel { transform: translateX(-100%); }
+  .workspace-body.show-canvas .canvas-panel { z-index: 10; }
+  .mobile-tabs { display: flex; }
+}
+
+/* --- CHAT PANEL CONTENTS --- */
 .chat-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 .message { max-width: 85%; }
 .message.user { align-self: flex-end; }
@@ -94,25 +119,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .typing-indicator { font-size: 12px; color: var(--accent2); padding: 0 20px 8px; display: none; }
 .typing-indicator.visible { display: block; }
 
-/* --- CANVAS --- */
-#canvas { flex-direction: column; }
-.canvas-header { height: 48px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; gap: 10px; flex-shrink: 0; }
-.canvas-body { flex: 1; display: flex; overflow: hidden; }
-.canvas-area { flex: 1; position: relative; overflow: auto; background: var(--bg); }
-.canvas-grid { position: absolute; width: 4000px; height: 4000px; background-image: radial-gradient(circle, #2a2f3d 1px, transparent 1px); background-size: 24px 24px; }
-.canvas-content { position: absolute; width: 4000px; height: 4000px; }
-
-/* Sidebar mini-chat */
-.canvas-sidebar { width: 280px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
-.sidebar-header { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--text2); }
-.sidebar-messages { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.sidebar-msg { font-size: 12px; line-height: 1.4; }
-.sidebar-msg .s-name { font-weight: 600; color: var(--accent2); }
-.sidebar-msg .s-text { color: var(--text); }
-.sidebar-msg.s-system { color: var(--text2); font-style: italic; }
-.sidebar-input { padding: 8px; border-top: 1px solid var(--border); display: flex; gap: 6px; }
-.sidebar-input .input { flex: 1; font-size: 12px; padding: 8px 10px; }
-.sidebar-input .btn { font-size: 11px; padding: 8px 12px; }
+/* (old canvas/sidebar styles removed — now in workspace split-view above) */
 
 /* --- ARTIFACT CARDS --- */
 .artifact-card { position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 300px; max-width: 500px; cursor: grab; user-select: none; transition: box-shadow .2s, border-color .2s; z-index: 1; }
@@ -299,9 +306,53 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 /* Footer */
 .viz-footer { display: flex; gap: 8px; justify-content: flex-end; }
 
-/* Legacy (keep for backward compat) */
-.agent-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
-.agent-option { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; text-align: center; transition: all .15s; }
-.agent-option:hover { border-color: var(--accent); background: rgba(108,92,231,.1); }
-.agent-option .agent-icon { font-size: 20px; margin-bottom: 2px; }
-.agent-option .agent-name { font-size: 11px; }
+/* --- ARTIFACT ACTION BAR --- */
+.artifact-actions { position: absolute; top: -34px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; z-index: 20; pointer-events: none; }
+.artifact-card:hover .artifact-actions { opacity: 1; pointer-events: auto; }
+.art-action-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 11px; cursor: pointer; transition: all .15s; font-family: inherit; white-space: nowrap; }
+.art-action-btn:hover { background: var(--surface2); border-color: var(--accent); color: var(--accent2); }
+.artifact-ask-bar { padding: 8px; border-top: 1px solid var(--border); display: none; gap: 6px; }
+.artifact-ask-bar.visible { display: flex; }
+.artifact-ask-bar .input { flex: 1; font-size: 12px; padding: 6px 10px; }
+.artifact-ask-bar .btn { font-size: 11px; padding: 6px 10px; }
+
+/* Transform dropdown */
+.transform-dropdown { position: absolute; top: 100%; right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 4px; z-index: 30; min-width: 160px; max-height: 300px; overflow-y: auto; display: none; }
+.transform-dropdown.visible { display: block; }
+.transform-option { padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text); transition: background .1s; }
+.transform-option:hover { background: var(--surface2); }
+
+/* Artifact updating overlay */
+.artifact-updating { position: absolute; inset: 0; background: rgba(15,17,23,.7); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; z-index: 15; }
+
+/* --- MENTION AUTOCOMPLETE --- */
+.mention-dropdown { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); max-height: 200px; overflow-y: auto; z-index: 600; display: none; min-width: 200px; }
+.mention-dropdown.visible { display: block; }
+.mention-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; transition: background .1s; }
+.mention-item:hover, .mention-item.active { background: var(--surface2); }
+.mention-item .mention-icon { font-size: 16px; }
+.mention-item .mention-title { color: var(--text); font-weight: 500; }
+.mention-item .mention-type { color: var(--text2); font-size: 10px; }
+
+/* Canvas action confirmation button in chat */
+.canvas-action-btn { margin-top: 8px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--green); background: rgba(0,206,201,.12); color: var(--green); font-size: 12px; cursor: pointer; transition: all .15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+.canvas-action-btn:hover { background: rgba(0,206,201,.25); transform: translateY(-1px); }
+
+/* Inline editing */
+.cell-editing { outline: 2px solid var(--accent); outline-offset: -1px; }
+.node-editing input { background: var(--surface2); border: 1px solid var(--accent); color: var(--text); border-radius: 4px; padding: 2px 6px; font-family: inherit; font-size: inherit; outline: none; }
+.checklist-check.interactive { cursor: pointer; }
+.checklist-check.interactive:hover { border-color: var(--green); }
+.kanban-card.dragging { opacity: .6; }
+.kanban-col.drag-over { background: rgba(108,92,231,.05); border-radius: 6px; }
+.add-row-btn, .add-col-btn { font-size: 11px; color: var(--text2); cursor: pointer; padding: 4px 8px; text-align: center; transition: color .15s; }
+.add-row-btn:hover, .add-col-btn:hover { color: var(--accent2); }
+
+/* Viz picker reference section */
+.viz-references { margin-bottom: 16px; }
+.viz-section-label { font-size: 12px; color: var(--text2); font-weight: 500; margin-bottom: 8px; }
+.viz-ref-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.viz-ref-chip { padding: 4px 12px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 11px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 4px; }
+.viz-ref-chip:hover { border-color: var(--accent); }
+.viz-ref-chip.selected { border-color: var(--accent); background: rgba(108,92,231,.15); color: var(--accent2); }
+.viz-ref-chip .ref-icon { font-size: 14px; }

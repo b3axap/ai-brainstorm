@@ -14,48 +14,40 @@ const state = {
   users: [],
   generating: false,
   agents: [],
-  pendingSuggestions: []  // Claude's suggested agent IDs for viz picker pre-selection
+  pendingSuggestions: []
 };
 
 // Load agents list
 fetch('/api/agents')
   .then(r => r.json())
-  .then(agents => {
-    state.agents = agents;
-    populateAgentGrid();
-  })
+  .then(agents => { state.agents = agents; })
   .catch(err => {
     console.error('Failed to load agents:', err);
     showToast('Failed to load visualization types');
   });
 
 // --- Socket.IO connection handling ---
-socket.on('connect_error', () => {
-  showToast('Connection error — retrying...');
-});
+socket.on('connect_error', () => showToast('Connection error — retrying...'));
 
 socket.on('disconnect', (reason) => {
   state.generating = false;
   document.getElementById('typingIndicator').classList.remove('visible');
-  if (reason !== 'io client disconnect') {
-    showToast('Disconnected — reconnecting...');
-  }
+  if (reason !== 'io client disconnect') showToast('Disconnected — reconnecting...');
 });
 
 socket.on('reconnect', () => {
   showToast('Reconnected!');
-  // Re-join room if we were in one
   if (state.roomId && state.userName) {
     socket.emit('join-room', { userName: state.userName, roomId: state.roomId });
   }
 });
 
-// --- Screen switching ---
+// --- Screen switching (landing / workspace) ---
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(name).classList.add('active');
   state.screen = name;
-  if (name === 'chat') document.getElementById('chatInput').focus();
+  if (name === 'workspace') document.getElementById('chatInput').focus();
 }
 
 // --- Toast ---
@@ -108,6 +100,7 @@ function sendChatMessage() {
   const content = input.value.trim();
   if (!content || state.generating) return;
   input.value = '';
+  closeMentionDropdown();
   socket.emit('send-message', { roomId: state.roomId, content });
 }
 
@@ -118,7 +111,6 @@ function addChatMessage(message) {
   div.id = `msg-${message.id}`;
 
   const nameLabel = message.role === 'assistant' ? 'Claude' : message.userName || 'User';
-
   div.innerHTML = `
     <div class="msg-header"><span class="name">${escHtml(nameLabel)}</span></div>
     <div class="msg-bubble">${escHtml(message.content)}</div>
@@ -127,9 +119,7 @@ function addChatMessage(message) {
   container.scrollTop = container.scrollHeight;
 }
 
-// Suggest buttons and clarify questions are now rendered inline in the claude-done handler
-
-// Streaming: Claude response building
+// --- Streaming ---
 let streamingMsgId = null;
 let streamingActive = false;
 
@@ -173,52 +163,95 @@ function endStreaming(fullMessage) {
   streamingActive = false;
 }
 
-// --- Canvas ---
-document.getElementById('goCanvasBtn').onclick = () => showScreen('canvas');
-document.getElementById('goChatBtn').onclick = () => showScreen('chat');
+// --- Resize Handle ---
+(function setupResizeHandle() {
+  const handle = document.getElementById('resizeHandle');
+  const body = document.getElementById('workspaceBody');
+  if (!handle || !body) return;
+
+  let dragging = false;
+
+  handle.onmousedown = (e) => {
+    dragging = true;
+    handle.classList.add('active');
+    e.preventDefault();
+  };
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const rect = body.getBoundingClientRect();
+    const chatWidth = Math.max(280, Math.min(e.clientX - rect.left, rect.width * 0.5));
+    body.style.gridTemplateColumns = `${chatWidth}px 4px 1fr`;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('active');
+  });
+})();
+
+// --- Mobile Tabs ---
+(function setupMobileTabs() {
+  const tabChat = document.getElementById('mobileTabChat');
+  const tabCanvas = document.getElementById('mobileTabCanvas');
+  const body = document.getElementById('workspaceBody');
+  if (!tabChat || !tabCanvas || !body) return;
+
+  tabChat.onclick = () => {
+    body.classList.remove('show-canvas');
+    tabChat.classList.add('active');
+    tabCanvas.classList.remove('active');
+  };
+
+  tabCanvas.onclick = () => {
+    body.classList.add('show-canvas');
+    tabCanvas.classList.add('active');
+    tabChat.classList.remove('active');
+  };
+})();
 
 // --- Visualization Picker Modal ---
-document.getElementById('newIdeaBtn').onclick = () => openVizPicker([]);
+document.getElementById('newVizBtn').onclick = () => openVizPicker([]);
 document.getElementById('vizCancelBtn').onclick = closeVizPicker;
 document.getElementById('vizPickerModal').onclick = (e) => {
   if (e.target.id === 'vizPickerModal') closeVizPicker();
 };
 
-// Custom viz checkbox toggles input
 document.getElementById('vizCustomCheck').onchange = (e) => {
   document.getElementById('vizCustomInput').disabled = !e.target.checked;
   if (e.target.checked) document.getElementById('vizCustomInput').focus();
   updateVizGenerateBtn();
 };
 
-// Generate selected button
 document.getElementById('vizGenerateBtn').onclick = () => {
   const selected = getSelectedVizTypes();
   const customText = document.getElementById('vizCustomCheck').checked
     ? document.getElementById('vizCustomInput').value.trim() : '';
+  const refIds = getSelectedRefIds();
 
   if (selected.length === 0 && !customText) return;
-
   closeVizPicker();
 
-  // Generate each selected type
   selected.forEach(typeId => {
-    socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
+    socket.emit('generate-artifact', { roomId: state.roomId, type: typeId, referenceIds: refIds });
   });
 
-  // Handle custom visualization
   if (customText) {
-    socket.emit('canvas-message', { roomId: state.roomId, content: customText });
-    socket.emit('generate-artifact', { roomId: state.roomId, type: 'freeform' });
+    socket.emit('send-message', { roomId: state.roomId, content: customText });
+    socket.emit('generate-artifact', { roomId: state.roomId, type: 'freeform', referenceIds: refIds });
   }
 
   const count = selected.length + (customText ? 1 : 0);
   showToast(`Generating ${count} visualization${count > 1 ? 's' : ''}...`);
 };
 
+document.getElementById('vizCustomInput').oninput = updateVizGenerateBtn;
+
 function openVizPicker(preSelected) {
   state.pendingSuggestions = preSelected || [];
   populateVizGrid();
+  populateVizRefs();
   document.getElementById('vizCustomCheck').checked = false;
   document.getElementById('vizCustomInput').value = '';
   document.getElementById('vizCustomInput').disabled = true;
@@ -243,22 +276,39 @@ function populateVizGrid() {
       <span class="viz-name">${escHtml(agent.name)}</span>
       ${isPreSelected ? '<span class="viz-recommended">recommended</span>' : ''}
     `;
-    const checkbox = card.querySelector('.viz-checkbox');
-    checkbox.onchange = () => {
-      card.classList.toggle('selected', checkbox.checked);
+    card.querySelector('.viz-checkbox').onchange = function() {
+      card.classList.toggle('selected', this.checked);
       updateVizGenerateBtn();
     };
     grid.appendChild(card);
   });
 }
 
-function populateAgentGrid() {
-  // Kept for backward compat — now just calls populateVizGrid when agents load
+function populateVizRefs() {
+  const refsContainer = document.getElementById('vizReferences');
+  const grid = document.getElementById('vizRefGrid');
+  if (state.artifacts.length === 0) {
+    refsContainer.style.display = 'none';
+    return;
+  }
+  refsContainer.style.display = '';
+  grid.innerHTML = '';
+  state.artifacts.forEach(art => {
+    const chip = document.createElement('div');
+    chip.className = 'viz-ref-chip';
+    chip.dataset.artifactId = art.id;
+    chip.innerHTML = `<span class="ref-icon">${art.icon || '📄'}</span> ${escHtml(art.title || 'Untitled')}`;
+    chip.onclick = () => chip.classList.toggle('selected');
+    grid.appendChild(chip);
+  });
 }
 
 function getSelectedVizTypes() {
-  return Array.from(document.querySelectorAll('.viz-checkbox:checked'))
-    .map(cb => cb.dataset.agentId);
+  return Array.from(document.querySelectorAll('.viz-checkbox:checked')).map(cb => cb.dataset.agentId);
+}
+
+function getSelectedRefIds() {
+  return Array.from(document.querySelectorAll('.viz-ref-chip.selected')).map(el => el.dataset.artifactId);
 }
 
 function updateVizGenerateBtn() {
@@ -271,34 +321,100 @@ function updateVizGenerateBtn() {
   btn.textContent = count > 0 ? `Generate Selected (${count})` : 'Generate Selected (0)';
 }
 
-// Update count when custom input changes
-document.getElementById('vizCustomInput').oninput = updateVizGenerateBtn;
+// --- @ Mention Autocomplete ---
+(function setupMentionAutocomplete() {
+  const input = document.getElementById('chatInput');
+  const dropdown = document.getElementById('mentionDropdown');
+  if (!input || !dropdown) return;
 
-// Sidebar mini-chat
-document.getElementById('sidebarSendBtn').onclick = sendSidebarMessage;
-document.getElementById('sidebarInput').onkeypress = (e) => {
-  if (e.key === 'Enter') sendSidebarMessage();
-};
+  let mentionActive = false;
+  let mentionStart = -1;
 
-function sendSidebarMessage() {
-  const input = document.getElementById('sidebarInput');
-  const content = input.value.trim();
-  if (!content) return;
-  input.value = '';
-  socket.emit('canvas-message', { roomId: state.roomId, content });
-}
+  input.addEventListener('input', () => {
+    const val = input.value;
+    const pos = input.selectionStart;
 
-function addSidebarMessage(message) {
-  const container = document.getElementById('sidebarMessages');
-  const div = document.createElement('div');
-  div.className = `sidebar-msg ${message.role === 'assistant' || message.role === 'system' ? 's-system' : ''}`;
-  if (message.role === 'user') {
-    div.innerHTML = `<span class="s-name">${escHtml(message.userName)}: </span><span class="s-text">${escHtml(message.content)}</span>`;
-  } else {
-    div.textContent = message.content;
+    // Find @ before cursor
+    const before = val.substring(0, pos);
+    const atIdx = before.lastIndexOf('@');
+
+    if (atIdx >= 0 && (atIdx === 0 || before[atIdx - 1] === ' ')) {
+      const query = before.substring(atIdx + 1).toLowerCase();
+      const matches = state.artifacts.filter(a =>
+        (a.title || '').toLowerCase().includes(query) ||
+        (a.type || '').toLowerCase().includes(query)
+      ).slice(0, 5);
+
+      if (matches.length > 0) {
+        mentionActive = true;
+        mentionStart = atIdx;
+        showMentionDropdown(matches, input);
+        return;
+      }
+    }
+
+    closeMentionDropdown();
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (!mentionActive) return;
+    if (e.key === 'Escape') {
+      closeMentionDropdown();
+      e.preventDefault();
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      const active = dropdown.querySelector('.mention-item.active') || dropdown.querySelector('.mention-item');
+      if (active && mentionActive) {
+        selectMention(active.dataset.artifactId, input);
+        e.preventDefault();
+      }
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const items = dropdown.querySelectorAll('.mention-item');
+      if (items.length === 0) return;
+      const current = dropdown.querySelector('.mention-item.active');
+      if (current) current.classList.remove('active');
+      let idx = Array.from(items).indexOf(current);
+      idx = e.key === 'ArrowDown' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+      items[idx].classList.add('active');
+      e.preventDefault();
+    }
+  });
+
+  function showMentionDropdown(matches, inputEl) {
+    dropdown.innerHTML = '';
+    matches.forEach((art, i) => {
+      const item = document.createElement('div');
+      item.className = `mention-item${i === 0 ? ' active' : ''}`;
+      item.dataset.artifactId = art.id;
+      item.innerHTML = `
+        <span class="mention-icon">${art.icon || '📄'}</span>
+        <span class="mention-title">${escHtml(art.title || 'Untitled')}</span>
+        <span class="mention-type">${escHtml(art.type)}</span>
+      `;
+      item.onclick = () => selectMention(art.id, inputEl);
+      dropdown.appendChild(item);
+    });
+
+    const rect = inputEl.getBoundingClientRect();
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+    dropdown.classList.add('visible');
   }
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
+
+  function selectMention(artifactId, inputEl) {
+    const art = state.artifacts.find(a => a.id === artifactId);
+    if (!art) return;
+    const val = inputEl.value;
+    const before = val.substring(0, mentionStart);
+    const after = val.substring(inputEl.selectionStart);
+    inputEl.value = before + '@' + (art.title || art.type) + ' ' + after;
+    closeMentionDropdown();
+    inputEl.focus();
+  }
+})();
+
+function closeMentionDropdown() {
+  const dropdown = document.getElementById('mentionDropdown');
+  if (dropdown) dropdown.classList.remove('visible');
 }
 
 // --- Artifact rendering on canvas ---
@@ -310,12 +426,21 @@ function renderArtifactCard(artifact) {
   card.style.top = artifact.position.y + 'px';
 
   card.innerHTML = `
+    <div class="artifact-actions">
+      <button class="art-action-btn" data-action="expand" title="Expand / deepen">⊕ Expand</button>
+      <button class="art-action-btn" data-action="transform" title="Convert to another type">⟲ Transform</button>
+      <button class="art-action-btn" data-action="ask" title="Ask about this">? Ask</button>
+    </div>
     <div class="artifact-head">
       <span class="a-icon">${artifact.icon || '📄'}</span>
       <span class="a-title">${escHtml(artifact.title || 'Untitled')}</span>
       <span class="a-author">by ${escHtml(artifact.author || '?')}</span>
     </div>
     <div class="artifact-body" id="abody-${artifact.id}"></div>
+    <div class="artifact-ask-bar" id="askbar-${artifact.id}">
+      <input class="input" placeholder="Ask about this visualization..." autocomplete="off">
+      <button class="btn btn-primary">Ask</button>
+    </div>
   `;
 
   document.getElementById('canvasContent').appendChild(card);
@@ -324,10 +449,112 @@ function renderArtifactCard(artifact) {
   const body = document.getElementById(`abody-${artifact.id}`);
   renderArtifact(artifact.renderer || artifact.type, artifact.data, body);
 
-  // Drag to move
+  // Setup action bar
+  setupArtifactActions(card, artifact);
+
+  // Setup drag
   setupDrag(card, artifact);
 
+  // Setup interactive layer if available
+  if (window.InteractiveLayer) {
+    new InteractiveLayer(card, artifact, socket);
+  }
+
   return card;
+}
+
+function setupArtifactActions(card, artifact) {
+  // Action buttons
+  card.querySelector('[data-action="expand"]').onclick = (e) => {
+    e.stopPropagation();
+    showArtifactUpdating(card);
+    socket.emit('artifact-action', { roomId: state.roomId, artifactId: artifact.id, action: 'expand' });
+  };
+
+  card.querySelector('[data-action="transform"]').onclick = (e) => {
+    e.stopPropagation();
+    showTransformDropdown(card, artifact);
+  };
+
+  card.querySelector('[data-action="ask"]').onclick = (e) => {
+    e.stopPropagation();
+    const askBar = document.getElementById(`askbar-${artifact.id}`);
+    askBar.classList.toggle('visible');
+    if (askBar.classList.contains('visible')) askBar.querySelector('input').focus();
+  };
+
+  // Ask bar submit
+  const askBar = document.getElementById(`askbar-${artifact.id}`);
+  const askInput = askBar.querySelector('input');
+  const askBtn = askBar.querySelector('button');
+
+  askBtn.onclick = () => submitAskQuestion(artifact, askInput, askBar, card);
+  askInput.onkeypress = (e) => {
+    if (e.key === 'Enter') submitAskQuestion(artifact, askInput, askBar, card);
+  };
+}
+
+function submitAskQuestion(artifact, askInput, askBar, card) {
+  const question = askInput.value.trim();
+  if (!question) return;
+  askInput.value = '';
+  askBar.classList.remove('visible');
+  showArtifactUpdating(card);
+  socket.emit('artifact-action', {
+    roomId: state.roomId,
+    artifactId: artifact.id,
+    action: 'ask',
+    payload: { question }
+  });
+}
+
+function showTransformDropdown(card, artifact) {
+  // Remove any existing dropdown
+  const existing = card.querySelector('.transform-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'transform-dropdown visible';
+  state.agents.forEach(agent => {
+    if (agent.id === artifact.type) return; // skip current type
+    const opt = document.createElement('div');
+    opt.className = 'transform-option';
+    opt.innerHTML = `${agent.icon} ${escHtml(agent.name)}`;
+    opt.onclick = (e) => {
+      e.stopPropagation();
+      dropdown.remove();
+      socket.emit('artifact-action', {
+        roomId: state.roomId,
+        artifactId: artifact.id,
+        action: 'transform',
+        payload: { targetType: agent.id }
+      });
+      showToast(`Transforming to ${agent.name}...`);
+    };
+    dropdown.appendChild(opt);
+  });
+  card.querySelector('.artifact-actions').appendChild(dropdown);
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function closeDropdown() {
+      dropdown.remove();
+      document.removeEventListener('click', closeDropdown);
+    }, { once: true });
+  }, 0);
+}
+
+function showArtifactUpdating(card) {
+  const overlay = document.createElement('div');
+  overlay.className = 'artifact-updating';
+  overlay.innerHTML = '<div class="gen-spinner"></div>';
+  card.style.position = 'absolute'; // ensure positioning context
+  card.appendChild(overlay);
+}
+
+function removeArtifactUpdating(card) {
+  const overlay = card.querySelector('.artifact-updating');
+  if (overlay) overlay.remove();
 }
 
 function setupDrag(card, artifact) {
@@ -335,10 +562,8 @@ function setupDrag(card, artifact) {
   let startX, startY, origLeft, origTop;
 
   function onMouseMove(e) {
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    card.style.left = (origLeft + dx) + 'px';
-    card.style.top = (origTop + dy) + 'px';
+    card.style.left = (origLeft + e.clientX - startX) + 'px';
+    card.style.top = (origTop + e.clientY - startY) + 'px';
   }
 
   function onMouseUp() {
@@ -350,6 +575,7 @@ function setupDrag(card, artifact) {
   }
 
   head.onmousedown = (e) => {
+    if (e.target.closest('.artifact-actions')) return; // don't drag from action buttons
     card.classList.add('dragging');
     startX = e.clientX;
     startY = e.clientY;
@@ -361,17 +587,16 @@ function setupDrag(card, artifact) {
   };
 }
 
-// --- Update user lists ---
+// --- Update UI helpers ---
 function updateUserLists() {
   const names = state.users.map(u => u.name).join(', ');
-  document.getElementById('chatUsers').textContent = names;
-  document.getElementById('canvasUsers').textContent = names;
+  const el = document.getElementById('usersList');
+  if (el) el.textContent = names;
 }
 
-// --- Room code display ---
 function updateRoomCode() {
-  document.getElementById('chatRoomCode').textContent = state.roomId;
-  document.getElementById('canvasRoomCode').textContent = state.roomId;
+  const el = document.getElementById('roomCode');
+  if (el) el.textContent = state.roomId;
 }
 
 document.querySelectorAll('.room-code').forEach(el => {
@@ -390,54 +615,37 @@ socket.on('room-joined', ({ room, user }) => {
   updateRoomCode();
   updateUserLists();
 
-  // Render personal chat messages
   state.messages.forEach(msg => addChatMessage(msg));
-
-  // Render existing artifacts on canvas
   room.artifacts.forEach(art => renderArtifactCard(art));
 
-  showScreen('chat');
+  showScreen('workspace');
 });
 
 socket.on('user-joined', ({ user }) => {
   state.users.push(user);
   updateUserLists();
-  addSidebarMessage({ role: 'system', content: `${user.name} joined` });
 });
 
 socket.on('user-left', ({ socketId }) => {
-  const user = state.users.find(u => u.socketId === socketId);
   state.users = state.users.filter(u => u.socketId !== socketId);
   updateUserLists();
-  if (user) {
-    addSidebarMessage({ role: 'system', content: `${user.name} left` });
-  }
 });
 
 socket.on('new-message', ({ message }) => {
   state.messages.push(message);
-  if (message.role === 'user') {
-    addChatMessage(message);
-  }
-});
-
-// Messages from other users (shown in sidebar only)
-socket.on('sidebar-message', ({ message }) => {
-  addSidebarMessage(message);
+  if (message.role === 'user') addChatMessage(message);
 });
 
 socket.on('claude-chunk', ({ chunk }) => {
   appendStream(chunk);
 });
 
-socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase, offerCanvas }) => {
+socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase, offerCanvas, canvasAction }) => {
   endStreaming(fullMessage);
   state.generating = false;
 
   const container = document.getElementById('chatMessages');
-  const lastMsg = streamingMsgId === null
-    ? container.querySelector('.message.assistant:last-child') || container.querySelector('.message:last-child')
-    : null;
+  const lastMsg = container.querySelector('.message.assistant:last-child');
   if (!lastMsg) return;
 
   const hasQuestions = clarifyQuestions && clarifyQuestions.length > 0;
@@ -481,19 +689,17 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase
         });
         qBlock.appendChild(optionsDiv);
       }
-
       questionsDiv.appendChild(qBlock);
     });
     actionsDiv.appendChild(questionsDiv);
     hasContent = true;
   }
 
-  // Canvas offer: "Push to Canvas" button that opens the viz picker modal
+  // Canvas offer: only on mandatory_done phase (first time)
   if (offerCanvas && hasSuggestions) {
     const canvasOffer = document.createElement('div');
     canvasOffer.className = 'canvas-offer';
 
-    // Quick-pick buttons for suggested types
     const quickLabel = document.createElement('div');
     quickLabel.className = 'canvas-offer-label';
     quickLabel.textContent = '\u2728 Suggested visualizations:';
@@ -510,7 +716,6 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase
       btn.innerHTML = `${agent.icon} ${agent.name}`;
       quickBtns.appendChild(btn);
     });
-    // Event delegation for suggest buttons
     quickBtns.onclick = (e) => {
       const btn = e.target.closest('.suggest-btn');
       if (!btn || btn.disabled) return;
@@ -524,14 +729,41 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase
     };
     canvasOffer.appendChild(quickBtns);
 
-    // "Push to Canvas" button opens full picker
     const pushBtn = document.createElement('button');
     pushBtn.className = 'push-to-canvas-btn';
-    pushBtn.textContent = '\uD83C\uDFA8 Push to Canvas \u2014 choose visualizations...';
+    pushBtn.textContent = '\uD83C\uDFA8 Choose more visualizations...';
     pushBtn.onclick = () => openVizPicker(suggestedTypes);
     canvasOffer.appendChild(pushBtn);
 
     actionsDiv.appendChild(canvasOffer);
+    hasContent = true;
+  }
+
+  // Canvas action from Claude (auto-detected intent)
+  if (canvasAction && canvasAction.intent) {
+    const actionDiv = document.createElement('div');
+    let label = '';
+    if (canvasAction.intent === 'create') {
+      const agent = state.agents.find(a => a.id === canvasAction.artifact_type);
+      label = agent ? `${agent.icon} Create ${agent.name}` : `Create ${canvasAction.artifact_type}`;
+    } else if (canvasAction.intent === 'update') {
+      const art = state.artifacts.find(a => a.id === canvasAction.target_id);
+      label = `Update ${art ? art.title : 'artifact'}`;
+    } else if (canvasAction.intent === 'transform') {
+      const agent = state.agents.find(a => a.id === canvasAction.artifact_type);
+      label = agent ? `Transform to ${agent.name}` : `Transform`;
+    }
+
+    const actionBtn = document.createElement('button');
+    actionBtn.className = 'canvas-action-btn';
+    actionBtn.innerHTML = `${label} →`;
+    actionBtn.onclick = () => {
+      actionBtn.disabled = true;
+      actionBtn.innerHTML = `<span class="auto-spinner"></span> ${label}...`;
+      socket.emit('execute-canvas-action', { roomId: state.roomId, canvasAction });
+    };
+    actionDiv.appendChild(actionBtn);
+    actionsDiv.appendChild(actionDiv);
     hasContent = true;
   }
 
@@ -541,9 +773,8 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase
   }
 });
 
-socket.on('artifact-generating', ({ type, status }) => {
+socket.on('artifact-generating', ({ type }) => {
   state.generating = true;
-  // Could show spinner in chat or canvas
 });
 
 socket.on('artifact-created', ({ artifact }) => {
@@ -551,6 +782,41 @@ socket.on('artifact-created', ({ artifact }) => {
   state.generating = false;
   renderArtifactCard(artifact);
   showToast(`${artifact.icon || '📄'} ${artifact.title || 'Untitled'} created!`);
+
+  // On mobile, switch to canvas to show the new artifact
+  if (window.innerWidth <= 768) {
+    const tabCanvas = document.getElementById('mobileTabCanvas');
+    if (tabCanvas) tabCanvas.click();
+  }
+});
+
+socket.on('artifact-updated', ({ artifactId, data, title }) => {
+  const art = state.artifacts.find(a => a.id === artifactId);
+  if (!art) return;
+
+  // Update state
+  art.data = data;
+  if (title) art.title = title;
+
+  // Re-render card body
+  const body = document.getElementById(`abody-${artifactId}`);
+  if (body) renderArtifact(art.renderer || art.type, data, body);
+
+  // Update title
+  const card = document.getElementById(`artifact-${artifactId}`);
+  if (card) {
+    removeArtifactUpdating(card);
+    if (title) {
+      const titleEl = card.querySelector('.a-title');
+      if (titleEl) titleEl.textContent = title;
+    }
+    // Re-attach interactive layer
+    if (window.InteractiveLayer) {
+      new InteractiveLayer(card, art, socket);
+    }
+  }
+
+  showToast(`${art.icon || '📄'} ${art.title} updated!`);
 });
 
 socket.on('artifact-moved', ({ artifactId, position }) => {
@@ -568,6 +834,8 @@ socket.on('generation-error', ({ message }) => {
   state.generating = false;
   showToast('Error: ' + message);
   document.getElementById('typingIndicator').classList.remove('visible');
+  // Remove any updating overlays
+  document.querySelectorAll('.artifact-updating').forEach(el => el.remove());
 });
 
 // --- Utility ---
