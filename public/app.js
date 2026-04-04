@@ -42,6 +42,10 @@ socket.on('reconnect', () => {
   }
 });
 
+socket.on('join-error', ({ message }) => {
+  showLandingError(message);
+});
+
 // --- Screen switching (landing / workspace) ---
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -341,6 +345,11 @@ document.getElementById('vizCancelBtn').onclick = closeVizPicker;
 document.getElementById('vizPickerModal').onclick = (e) => {
   if (e.target.id === 'vizPickerModal') closeVizPicker();
 };
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('vizPickerModal').classList.contains('active')) {
+    closeVizPicker();
+  }
+});
 
 document.getElementById('vizCustomCheck').onchange = (e) => {
   document.getElementById('vizCustomInput').disabled = !e.target.checked;

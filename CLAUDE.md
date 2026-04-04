@@ -374,32 +374,33 @@ SVG `<text>` elements with `data-edit` get special handling: the engine injects 
 | `.bs-drag-over` | Drop target being hovered |
 | `.bs-interactive` | Clickable toggle/cycle element |
 
-## Replit Merge Notes
+## Gotchas & Common Mistakes
 
-**IMPORTANT:** If Replit already has the old `InteractiveLayer` code (the switch-case version with `setupMindmapInteractivity`, `setupTableInteractivity`, etc.), it must be fully replaced by the new `InteractiveEngine`. The old per-renderer handlers are gone — all interactivity now comes from data-attributes.
+**Before changing anything, check these:**
 
-**Key merge points to check:**
+1. **JSON parsing uses `extractLastJsonBlock()`** (server.js) — a brace-depth counter, NOT regex. Do not replace with regex — nested objects like `{"questions":[{"q":"...","options":["A","B"]}]}` break simple regex patterns.
 
-1. **`public/interactive.js`** — This file was **completely rewritten**. Do NOT merge — take the GitHub version wholesale. The old `InteractiveLayer` class with `patchMindmapLabel()`, `setupTableInteractivity()`, etc. is replaced by `InteractiveEngine` with `scan()`, `attachEditHandlers()`, etc. A backward-compat alias `window.InteractiveLayer = InteractiveEngine` exists so any remaining references work.
+2. **All API response access must use `extractResponseText(response)`** (server.js) — safely extracts `response.content[0].text`. Do NOT access `response.content[0].text` directly.
 
-2. **`public/renderers.js`** — Every renderer function changed to add `data-*` attributes. Also has `BRAINSTORM_SDK_SCRIPT` const at the bottom. If Replit has custom renderer tweaks, merge them into the new annotated versions — but **keep the data-attributes intact** or interactivity breaks.
+3. **All interactive CSS classes start with `.bs-`** — `.bs-input`, `.bs-editing`, `.bs-add-btn`, `.bs-add-zone`, `.bs-delete-btn`, `.bs-dragging`, `.bs-drag-over`, `.bs-interactive`, `.bs-edit-code-btn`, `.bs-add-slide-btn`. Check style.css before claiming they're missing.
 
-3. **`server.js`** — Added `artifact-array-op` socket handler (after existing `artifact-data-patch` handler). This is an addition, not a replacement — should merge cleanly. If Replit added other socket handlers, they won't conflict.
+4. **Interactivity is data-attribute driven** — renderers use `data-edit`, `data-toggle`, `data-add`, `data-delete`, `data-drag-item`, `data-drag-target`. `InteractiveEngine` (interactive.js) handles all of them generically. Do NOT add per-renderer handler code.
 
-4. **`public/app.js`** — Two small changes: `new InteractiveLayer(...)` → `new InteractiveEngine(...)` in two places, plus `engine.forwardUpdate(data)` call. If Replit still references `InteractiveLayer`, the alias covers it, but updating is cleaner.
+5. **Room code validation** — if `roomId` is provided but not found, server emits `join-error`, does NOT create a new room.
 
-5. **`public/style.css`** — Old `.cell-editing`, `.node-editing`, `.kanban-card.dragging` styles replaced by `.bs-*` classes. Old class names kept as legacy compat. New `.bs-*` styles are additive — if Replit added custom CSS, it should merge fine as long as old interactive class names aren't relied upon for new functionality.
+6. **Port is 5000** — `.replit` sets `PORT="5000"` and `localPort=5000`. server.js default is also 5000. Do not change to 3000.
 
-6. **`agents/freeform.json`** — `systemPrompt` expanded with SDK documentation. Take the GitHub version — it's a superset of the old prompt.
+7. **Source of truth is GitHub** — after making changes on Replit, always sync back. `CLAUDE.md`, `design.md`, and `agents/*.json` should not be modified on Replit without pushing to GitHub.
 
-**Quick verification after merge:**
-```
-1. Open app → Create room → generate any artifact
-2. Double-click text on it → inline edit should appear
-3. Click "+" zones → items should be added
-4. Hover items → "x" delete buttons should appear
-5. Open 2 tabs in same room → edits sync in real-time
-```
+## Helper Functions Reference (server.js)
+
+| Function | Purpose | Do NOT reinvent |
+|----------|---------|-----------------|
+| `extractLastJsonBlock(text)` | Finds last `{...}` in text via brace-depth counting | JSON extraction from Claude responses |
+| `extractResponseText(response)` | Safe `response.content[0].text` access with null check | API response reading |
+| `buildContext(room, socketId)` | Builds system prompt + message history for Claude calls | Context assembly |
+| `generateId()` | Timestamp + random ID | Unique IDs for messages/artifacts |
+| `generateRoomId()` | 6-char uppercase alphanumeric | Room codes |
 
 ## Current Limitations (MVP)
 

@@ -43,6 +43,29 @@ function generateId() {
 
 const COLORS = ['#6c5ce7', '#00cec9', '#fdcb6e', '#fd79a8', '#74b9ff', '#ff6b6b', '#a29bfe', '#55efc4'];
 
+// Extract last JSON object from text using brace-depth matching
+function extractLastJsonBlock(text) {
+  let lastOpen = -1;
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (text[i] === '}') { lastOpen = i; break; }
+  }
+  if (lastOpen === -1) return null;
+
+  let depth = 0;
+  for (let i = lastOpen; i >= 0; i--) {
+    if (text[i] === '}') depth++;
+    else if (text[i] === '{') depth--;
+    if (depth === 0) return text.slice(i, lastOpen + 1);
+  }
+  return null;
+}
+
+// Safely extract text from Claude API response
+function extractResponseText(response) {
+  if (!response || !response.content || !response.content[0]) return null;
+  return response.content[0].text || null;
+}
+
 // Grid-based positioning for artifacts (2 columns, 540px wide + 40px gap)
 function calcArtifactPosition(index) {
   const COLS = 2;
@@ -236,12 +259,11 @@ Rules:
     let offerCanvas = false;
     let canvasAction = null;
 
-    // Find the last JSON block in the response
-    const jsonMatch = fullResponse.match(/\{[^{}]*(?:"suggest"|"questions"|"offer_canvas"|"canvas_action")[^{}]*\}/)
-      || fullResponse.match(/\{\s*\}$/m);
-    if (jsonMatch) {
+    // Extract last JSON block using brace-depth matching (handles nested objects)
+    const jsonBlock = extractLastJsonBlock(fullResponse);
+    if (jsonBlock) {
       try {
-        const parsed = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonBlock);
         suggestedTypes = parsed.suggest || [];
         clarifyQuestions = parsed.questions || [];
         offerCanvas = parsed.offer_canvas || false;
@@ -250,10 +272,9 @@ Rules:
     }
 
     // Clean response text (remove JSON block)
-    const cleanResponse = fullResponse
-      .replace(/\{[^{}]*(?:"suggest"|"questions"|"offer_canvas"|"canvas_action")[^{}]*\}/, '')
-      .replace(/\{\s*\}$/m, '')
-      .trim();
+    const cleanResponse = jsonBlock
+      ? fullResponse.slice(0, fullResponse.lastIndexOf(jsonBlock)).trim()
+      : fullResponse.trim();
 
     // Store in user's personal chat (with cap)
     const assistantMsg = {
@@ -312,7 +333,8 @@ async function handleArtifactExpand(room, artifact, socket) {
     messages: [{ role: 'user', content: 'Expand this visualization with more detail.' }]
   });
 
-  const text = response.content[0].text;
+  const text = extractResponseText(response);
+  if (!text) throw new Error('Empty response from Claude');
   let data;
   try { data = JSON.parse(text); } catch {
     const m = text.match(/\{[\s\S]*\}/);
@@ -341,7 +363,8 @@ async function handleArtifactTransform(room, artifact, targetType, socket) {
     messages: [{ role: 'user', content: `Convert this ${artifact.type} into a ${targetType}.` }]
   });
 
-  const text = response.content[0].text;
+  const text = extractResponseText(response);
+  if (!text) throw new Error('Empty response from Claude');
   let data;
   try { data = JSON.parse(text); } catch {
     const m = text.match(/\{[\s\S]*\}/);
@@ -379,7 +402,8 @@ async function handleArtifactAsk(room, artifact, question, socket) {
     messages: [{ role: 'user', content: question }]
   });
 
-  const text = response.content[0].text;
+  const text = extractResponseText(response);
+  if (!text) throw new Error('Empty response from Claude');
   let data;
   try { data = JSON.parse(text); } catch {
     const m = text.match(/\{[\s\S]*\}/);
@@ -416,7 +440,8 @@ async function handleArtifactGeneration(room, type, userName, socket, referenceI
         messages: messages
       });
 
-      const text = response.content[0].text;
+      const text = extractResponseText(response);
+      if (!text) throw new Error('Empty response from Claude');
       let data;
       try {
         data = JSON.parse(text);
@@ -471,7 +496,8 @@ async function handleArtifactGeneration(room, type, userName, socket, referenceI
       messages: messages
     });
 
-    const text = response.content[0].text;
+    const text = extractResponseText(response);
+    if (!text) throw new Error('Empty response from Claude');
     let data;
 
     // Try to parse JSON from response
@@ -536,8 +562,12 @@ io.on('connection', (socket) => {
 
     if (roomId && rooms[roomId]) {
       room = rooms[roomId];
+    } else if (roomId && !rooms[roomId]) {
+      // User provided a code that doesn't exist — error, don't create
+      socket.emit('join-error', { message: 'Room not found. Check the code and try again.' });
+      return;
     } else {
-      const id = roomId || generateRoomId();
+      const id = generateRoomId();
       room = {
         id: id,
         messages: [],       // shared activity log (for canvas sidebar)
