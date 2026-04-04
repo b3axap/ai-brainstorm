@@ -85,6 +85,10 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .clarify-option-btn.selected { border-color: var(--accent); background: rgba(108,92,231,.2); color: var(--accent2); }
 .claude-actions { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .actions-label { font-size: 11px; color: var(--text2); font-weight: 500; margin-top: 4px; }
+.canvas-offer { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.canvas-offer-label { font-size: 12px; color: var(--text2); font-weight: 500; }
+.push-to-canvas-btn { padding: 10px 20px; border-radius: 8px; border: 1px solid #00b894; background: rgba(0,184,148,.12); color: #55efc4; font-size: 13px; cursor: pointer; transition: all .15s; font-weight: 500; align-self: flex-start; }
+.push-to-canvas-btn:hover { background: rgba(0,184,148,.25); transform: translateY(-1px); }
 .chat-input { padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); display: flex; gap: 10px; flex-shrink: 0; }
 .chat-input .input { flex: 1; }
 .typing-indicator { font-size: 12px; color: var(--accent2); padding: 0 20px 8px; display: none; }
@@ -272,7 +276,30 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 500; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .modal-overlay.active { opacity: 1; pointer-events: auto; }
 .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 560px; max-width: 90vw; box-shadow: var(--shadow); max-height: 80vh; overflow-y: auto; }
-.modal h2 { font-size: 16px; margin-bottom: 16px; }
+.modal-wide { width: 680px; }
+.modal h2 { font-size: 16px; margin-bottom: 4px; }
+.modal-subtitle { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+
+/* Viz picker grid */
+.viz-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+.viz-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; transition: all .15s; text-align: center; position: relative; }
+.viz-card:hover { border-color: var(--accent); background: rgba(108,92,231,.08); }
+.viz-card.selected { border-color: var(--accent); background: rgba(108,92,231,.15); box-shadow: 0 0 0 1px var(--accent); }
+.viz-card .viz-checkbox { position: absolute; top: 6px; right: 6px; accent-color: var(--accent); }
+.viz-card .viz-icon { font-size: 22px; }
+.viz-card .viz-name { font-size: 11px; color: var(--text); font-weight: 500; }
+.viz-recommended { font-size: 9px; color: #55efc4; background: rgba(0,184,148,.15); padding: 1px 6px; border-radius: 4px; }
+
+/* Custom viz input */
+.viz-custom { margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px; }
+.viz-custom-label { font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.viz-custom-label input[type="checkbox"] { accent-color: var(--accent); }
+.viz-custom .input:disabled { opacity: .4; }
+
+/* Footer */
+.viz-footer { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Legacy (keep for backward compat) */
 .agent-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
 .agent-option { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; text-align: center; transition: all .15s; }
 .agent-option:hover { border-color: var(--accent); background: rgba(108,92,231,.1); }

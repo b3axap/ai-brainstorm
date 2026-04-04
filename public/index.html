@@ -85,22 +85,27 @@
   </div>
 </div>
 
-<!-- NEW IDEA MODAL -->
-<div class="modal-overlay" id="newIdeaModal">
-  <div class="modal">
-    <h2>✨ Generate New Visualization</h2>
-    <div class="input-group">
-      <label>Your idea (optional — uses chat context if empty)</label>
-      <input class="input" id="newIdeaInput" type="text" placeholder="Additional context for this visualization...">
+<!-- VISUALIZATION PICKER MODAL -->
+<div class="modal-overlay" id="vizPickerModal">
+  <div class="modal modal-wide">
+    <h2>🎨 Choose Visualizations</h2>
+    <p class="modal-subtitle">Select one or more. Claude's suggestions are pre-selected.</p>
+
+    <div class="viz-grid" id="vizGrid">
+      <!-- Populated by JS: agent cards with checkboxes -->
     </div>
-    <div class="input-group">
-      <label>Choose visualization type</label>
-      <div class="agent-grid" id="agentGrid">
-        <!-- Populated by JS -->
-      </div>
+
+    <div class="viz-custom">
+      <label class="viz-custom-label">
+        <input type="checkbox" id="vizCustomCheck">
+        <span>✏️ Custom visualization</span>
+      </label>
+      <input class="input" id="vizCustomInput" type="text" placeholder="Describe what you want to see..." disabled>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn" id="modalCancelBtn">Cancel</button>
+
+    <div class="viz-footer">
+      <button class="btn" id="vizCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="vizGenerateBtn" disabled>Generate Selected (0)</button>
     </div>
   </div>
 </div>

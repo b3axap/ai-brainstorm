@@ -13,7 +13,8 @@ const state = {
   artifacts: [],
   users: [],
   generating: false,
-  agents: []
+  agents: [],
+  pendingSuggestions: []  // Claude's suggested agent IDs for viz picker pre-selection
 };
 
 // Load agents list
@@ -146,44 +147,102 @@ function endStreaming(fullMessage) {
 document.getElementById('goCanvasBtn').onclick = () => showScreen('canvas');
 document.getElementById('goChatBtn').onclick = () => showScreen('chat');
 
-// New Idea modal
-document.getElementById('newIdeaBtn').onclick = () => {
-  document.getElementById('newIdeaModal').classList.add('active');
-};
-document.getElementById('modalCancelBtn').onclick = () => {
-  document.getElementById('newIdeaModal').classList.remove('active');
-};
-document.getElementById('newIdeaModal').onclick = (e) => {
-  if (e.target === document.getElementById('newIdeaModal')) {
-    document.getElementById('newIdeaModal').classList.remove('active');
-  }
+// --- Visualization Picker Modal ---
+document.getElementById('newIdeaBtn').onclick = () => openVizPicker([]);
+document.getElementById('vizCancelBtn').onclick = closeVizPicker;
+document.getElementById('vizPickerModal').onclick = (e) => {
+  if (e.target.id === 'vizPickerModal') closeVizPicker();
 };
 
-function populateAgentGrid() {
-  const grid = document.getElementById('agentGrid');
+// Custom viz checkbox toggles input
+document.getElementById('vizCustomCheck').onchange = (e) => {
+  document.getElementById('vizCustomInput').disabled = !e.target.checked;
+  if (e.target.checked) document.getElementById('vizCustomInput').focus();
+  updateVizGenerateBtn();
+};
+
+// Generate selected button
+document.getElementById('vizGenerateBtn').onclick = () => {
+  const selected = getSelectedVizTypes();
+  const customText = document.getElementById('vizCustomCheck').checked
+    ? document.getElementById('vizCustomInput').value.trim() : '';
+
+  if (selected.length === 0 && !customText) return;
+
+  closeVizPicker();
+
+  // Generate each selected type
+  selected.forEach(typeId => {
+    socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
+  });
+
+  // Handle custom visualization
+  if (customText) {
+    socket.emit('canvas-message', { roomId: state.roomId, content: customText });
+    socket.emit('generate-artifact', { roomId: state.roomId, type: 'freeform' });
+  }
+
+  const count = selected.length + (customText ? 1 : 0);
+  showToast(`Generating ${count} visualization${count > 1 ? 's' : ''}...`);
+};
+
+function openVizPicker(preSelected) {
+  state.pendingSuggestions = preSelected || [];
+  populateVizGrid();
+  document.getElementById('vizCustomCheck').checked = false;
+  document.getElementById('vizCustomInput').value = '';
+  document.getElementById('vizCustomInput').disabled = true;
+  document.getElementById('vizPickerModal').classList.add('active');
+  updateVizGenerateBtn();
+}
+
+function closeVizPicker() {
+  document.getElementById('vizPickerModal').classList.remove('active');
+}
+
+function populateVizGrid() {
+  const grid = document.getElementById('vizGrid');
   grid.innerHTML = '';
   state.agents.forEach(agent => {
-    const div = document.createElement('div');
-    div.className = 'agent-option';
-    div.innerHTML = `<div class="agent-icon">${agent.icon}</div><div class="agent-name">${escHtml(agent.name)}</div>`;
-    div.onclick = () => {
-      if (state.generating) return;
-      state.generating = true;
-      document.getElementById('newIdeaModal').classList.remove('active');
-
-      // If there's additional context, send it as a message first
-      const extraContext = document.getElementById('newIdeaInput').value.trim();
-      if (extraContext) {
-        socket.emit('canvas-message', { roomId: state.roomId, content: extraContext });
-      }
-      document.getElementById('newIdeaInput').value = '';
-
-      socket.emit('generate-artifact', { roomId: state.roomId, type: agent.id });
-      showToast(`Generating ${agent.name}...`);
+    const isPreSelected = state.pendingSuggestions.includes(agent.id);
+    const card = document.createElement('label');
+    card.className = `viz-card${isPreSelected ? ' selected' : ''}`;
+    card.innerHTML = `
+      <input type="checkbox" class="viz-checkbox" data-agent-id="${agent.id}" ${isPreSelected ? 'checked' : ''}>
+      <span class="viz-icon">${agent.icon}</span>
+      <span class="viz-name">${escHtml(agent.name)}</span>
+      ${isPreSelected ? '<span class="viz-recommended">recommended</span>' : ''}
+    `;
+    const checkbox = card.querySelector('.viz-checkbox');
+    checkbox.onchange = () => {
+      card.classList.toggle('selected', checkbox.checked);
+      updateVizGenerateBtn();
     };
-    grid.appendChild(div);
+    grid.appendChild(card);
   });
 }
+
+function populateAgentGrid() {
+  // Kept for backward compat — now just calls populateVizGrid when agents load
+}
+
+function getSelectedVizTypes() {
+  return Array.from(document.querySelectorAll('.viz-checkbox:checked'))
+    .map(cb => cb.dataset.agentId);
+}
+
+function updateVizGenerateBtn() {
+  const selected = getSelectedVizTypes();
+  const hasCustom = document.getElementById('vizCustomCheck').checked
+    && document.getElementById('vizCustomInput').value.trim();
+  const count = selected.length + (hasCustom ? 1 : 0);
+  const btn = document.getElementById('vizGenerateBtn');
+  btn.disabled = count === 0;
+  btn.textContent = count > 0 ? `Generate Selected (${count})` : 'Generate Selected (0)';
+}
+
+// Update count when custom input changes
+document.getElementById('vizCustomInput').oninput = updateVizGenerateBtn;
 
 // Sidebar mini-chat
 document.getElementById('sidebarSendBtn').onclick = sendSidebarMessage;
@@ -295,20 +354,17 @@ document.querySelectorAll('.room-code').forEach(el => {
 socket.on('room-joined', ({ room, user }) => {
   state.roomId = room.id;
   state.users = room.users;
-  state.messages = room.messages;
+  state.messages = room.messages || [];
   state.artifacts = room.artifacts;
 
   updateRoomCode();
   updateUserLists();
 
-  // Render existing messages in chat
-  room.messages.forEach(msg => addChatMessage(msg));
+  // Render personal chat messages
+  state.messages.forEach(msg => addChatMessage(msg));
 
   // Render existing artifacts on canvas
   room.artifacts.forEach(art => renderArtifactCard(art));
-
-  // Also populate sidebar with recent messages
-  room.messages.filter(m => m.role === 'user').slice(-10).forEach(msg => addSidebarMessage(msg));
 
   showScreen('chat');
 });
@@ -332,8 +388,12 @@ socket.on('new-message', ({ message }) => {
   state.messages.push(message);
   if (message.role === 'user') {
     addChatMessage(message);
-    addSidebarMessage(message);
   }
+});
+
+// Messages from other users (shown in sidebar only)
+socket.on('sidebar-message', ({ message }) => {
+  addSidebarMessage(message);
 });
 
 socket.on('claude-chunk', ({ chunk }) => {
@@ -396,18 +456,19 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase
     hasContent = true;
   }
 
-  // Canvas offer: show visualization picker button (user decides when to generate)
+  // Canvas offer: "Push to Canvas" button that opens the viz picker modal
   if (offerCanvas && hasSuggestions) {
     const canvasOffer = document.createElement('div');
     canvasOffer.className = 'canvas-offer';
 
-    const offerLabel = document.createElement('div');
-    offerLabel.className = 'canvas-offer-label';
-    offerLabel.textContent = '\uD83C\uDFA8 Ready to visualize? Pick what to generate:';
-    canvasOffer.appendChild(offerLabel);
+    // Quick-pick buttons for suggested types
+    const quickLabel = document.createElement('div');
+    quickLabel.className = 'canvas-offer-label';
+    quickLabel.textContent = '\u2728 Suggested visualizations:';
+    canvasOffer.appendChild(quickLabel);
 
-    const buttonsDiv = document.createElement('div');
-    buttonsDiv.className = 'suggest-buttons';
+    const quickBtns = document.createElement('div');
+    quickBtns.className = 'suggest-buttons';
     suggestedTypes.forEach(typeId => {
       const agent = state.agents.find(a => a.id === typeId);
       if (!agent) return;
@@ -415,38 +476,21 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase
       btn.className = 'suggest-btn';
       btn.innerHTML = `${agent.icon} ${agent.name}`;
       btn.onclick = () => {
-        if (state.generating) return;
-        state.generating = true;
         btn.innerHTML = `<span class="auto-spinner"></span> ${agent.name}...`;
         btn.disabled = true;
         socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
         showToast(`Generating ${agent.name}...`);
       };
-      buttonsDiv.appendChild(btn);
+      quickBtns.appendChild(btn);
     });
-    canvasOffer.appendChild(buttonsDiv);
+    canvasOffer.appendChild(quickBtns);
 
-    // "Generate all" button
-    if (suggestedTypes.length > 1) {
-      const allBtn = document.createElement('button');
-      allBtn.className = 'generate-all-btn';
-      allBtn.textContent = '\u26A1 Generate all';
-      allBtn.onclick = () => {
-        if (state.generating) return;
-        state.generating = true;
-        allBtn.innerHTML = '<span class="auto-spinner"></span> Generating...';
-        allBtn.disabled = true;
-        buttonsDiv.querySelectorAll('.suggest-btn').forEach(b => b.disabled = true);
-        suggestedTypes.forEach(typeId => {
-          const agent = state.agents.find(a => a.id === typeId);
-          if (agent) {
-            socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
-          }
-        });
-        showToast('Generating all visualizations...');
-      };
-      canvasOffer.appendChild(allBtn);
-    }
+    // "Push to Canvas" button opens full picker
+    const pushBtn = document.createElement('button');
+    pushBtn.className = 'push-to-canvas-btn';
+    pushBtn.textContent = '\uD83C\uDFA8 Push to Canvas \u2014 choose visualizations...';
+    pushBtn.onclick = () => openVizPicker(suggestedTypes);
+    canvasOffer.appendChild(pushBtn);
 
     actionsDiv.appendChild(canvasOffer);
     hasContent = true;

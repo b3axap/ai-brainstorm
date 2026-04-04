@@ -27,6 +27,12 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // --- In-memory rooms ---
 const rooms = {};
 
+// --- Concurrency: per-socket request locks & active streams ---
+const activeLocks = new Map();    // socketId -> boolean (true = Claude call in-flight)
+const activeAborts = new Map();   // socketId -> AbortController
+
+const MAX_MESSAGES = 200;         // Cap per-user and shared message history
+
 function generateRoomId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
@@ -37,8 +43,8 @@ function generateId() {
 
 const COLORS = ['#6c5ce7', '#00cec9', '#fdcb6e', '#fd79a8', '#74b9ff', '#ff6b6b', '#a29bfe', '#55efc4'];
 
-// --- Context builder: keeps canvas aware of the idea ---
-function buildContext(room) {
+// --- Context builder: uses per-user chat history ---
+function buildContext(room, socketId) {
   const userNames = room.users.map(u => u.name).join(', ') || 'none';
   const artifactList = room.artifacts.map(a => `- [${a.type}] "${a.title}" by ${a.author}`).join('\n') || 'none yet';
 
@@ -50,10 +56,11 @@ ${artifactList}
 
 Your job is to help users develop their ideas, make connections between different perspectives, and suggest useful visualizations.`;
 
-  // Build messages array with user attribution
-  let msgs = room.messages.map(m => ({
+  // Use per-user chat history
+  const userChat = room.userChats[socketId];
+  let msgs = (userChat ? userChat.messages : []).map(m => ({
     role: m.role === 'assistant' ? 'assistant' : 'user',
-    content: m.role === 'user' ? `[${m.userName}]: ${m.content}` : m.content
+    content: m.content
   }));
 
   // Trim if too long: keep first 5 + last 30
@@ -64,19 +71,20 @@ Your job is to help users develop their ideas, make connections between differen
   return { systemBase, messages: msgs };
 }
 
-// --- Chat analysis: Claude responds with structured flow ---
+// --- Chat analysis: Claude responds with structured flow (per-user) ---
 async function handleChatAnalysis(room, socket) {
-  const { systemBase, messages } = buildContext(room);
+  const { systemBase, messages } = buildContext(room, socket.id);
   const agentList = getAgentSummaries()
     .map(a => `${a.id}: ${a.icon} ${a.name} — ${a.description}`)
     .join('\n');
 
-  // Track conversation phase
-  const userMsgCount = room.messages.filter(m => m.role === 'user').length;
+  // Per-user phase tracking
+  const userChat = room.userChats[socket.id];
+  const phase = userChat ? userChat.phase : { mandatoryDone: false, mandatoryDoneAtMsg: 0, msgCount: 0 };
+  const userMsgCount = phase.msgCount;
   const isFirstMessage = userMsgCount <= 1;
-  const mandatoryDone = room.mandatoryQuestionsDone || false;
-  // After mandatory phase, count user messages since mandatory was completed
-  const msgsSinceMandatory = mandatoryDone ? (userMsgCount - (room.mandatoryDoneAtMsg || 0)) : 0;
+  const mandatoryDone = phase.mandatoryDone;
+  const msgsSinceMandatory = mandatoryDone ? (userMsgCount - phase.mandatoryDoneAtMsg) : 0;
   const shouldOfferCanvas = mandatoryDone && (msgsSinceMandatory === 1 || msgsSinceMandatory % 3 === 0);
 
   let phasePrompt;
@@ -167,7 +175,7 @@ Rules:
 
     stream.on('text', (text) => {
       fullResponse += text;
-      io.to(room.id).emit('claude-chunk', { roomId: room.id, chunk: text });
+      socket.emit('claude-chunk', { roomId: room.id, chunk: text });
     });
 
     await stream.finalMessage();
@@ -203,11 +211,11 @@ Rules:
       }
     }
 
-    // Track mandatory phase completion
-    if (phase === 'mandatory_done' && !room.mandatoryQuestionsDone) {
-      room.mandatoryQuestionsDone = true;
-      room.mandatoryDoneAtMsg = room.messages.filter(m => m.role === 'user').length;
-      offerCanvas = true; // Always offer canvas right after mandatory phase
+    // Track mandatory phase completion (per-user)
+    if (phase === 'mandatory_done' && userChat && !userChat.phase.mandatoryDone) {
+      userChat.phase.mandatoryDone = true;
+      userChat.phase.mandatoryDoneAtMsg = userChat.phase.msgCount;
+      offerCanvas = true;
     }
 
     // Clean response text (remove JSON block)
@@ -218,16 +226,19 @@ Rules:
       .replace(/\{[^{}]*"questions"\s*:\s*\[[^\]]*\][^{}]*\}/, '')
       .trim();
 
-    // Store assistant message
-    room.messages.push({
+    // Store in user's personal chat
+    const assistantMsg = {
       id: generateId(),
       role: 'assistant',
       content: cleanResponse,
       userName: 'Claude',
       timestamp: Date.now()
-    });
+    };
+    if (userChat) userChat.messages.push(assistantMsg);
+    room.messages.push(assistantMsg);
 
-    io.to(room.id).emit('claude-done', {
+    // Send only to this user
+    socket.emit('claude-done', {
       roomId: room.id,
       fullMessage: cleanResponse,
       suggestedTypes: suggestedTypes,
@@ -258,7 +269,7 @@ async function handleArtifactGeneration(room, type, userName, socket) {
   // External API agents (placeholder for now)
   if (agent.externalAPI) {
     // Step 1: Ask Claude to formulate a prompt
-    const { systemBase, messages } = buildContext(room);
+    const { systemBase, messages } = buildContext(room, socket.id);
     try {
       const response = await getAnthropicClient().messages.create({
         model: 'claude-sonnet-4-20250514',
@@ -300,7 +311,7 @@ async function handleArtifactGeneration(room, type, userName, socket) {
   }
 
   // Claude-based agents
-  const { systemBase, messages } = buildContext(room);
+  const { systemBase, messages } = buildContext(room, socket.id);
   const fullSystem = `${systemBase}\n\n${agent.systemPrompt}`;
 
   try {
@@ -380,11 +391,10 @@ io.on('connection', (socket) => {
       const id = roomId || generateRoomId();
       room = {
         id: id,
-        messages: [],
+        messages: [],       // shared activity log (for canvas sidebar)
         artifacts: [],
         users: [],
-        mandatoryQuestionsDone: false,
-        mandatoryDoneAtMsg: 0
+        userChats: {}       // per-user chat: { socketId: { messages: [], phase: { mandatoryDone, mandatoryDoneAtMsg, msgCount } } }
       };
       rooms[id] = room;
     }
@@ -397,8 +407,24 @@ io.on('connection', (socket) => {
     room.users.push(user);
     socket.join(room.id);
 
-    // Send full room state to joining user
-    socket.emit('room-joined', { room, user });
+    // Initialize per-user chat
+    if (!room.userChats[socket.id]) {
+      room.userChats[socket.id] = {
+        messages: [],
+        phase: { mandatoryDone: false, mandatoryDoneAtMsg: 0, msgCount: 0 }
+      };
+    }
+
+    // Send room state (artifacts shared, chat personal)
+    socket.emit('room-joined', {
+      room: {
+        id: room.id,
+        artifacts: room.artifacts,
+        users: room.users,
+        messages: room.userChats[socket.id].messages
+      },
+      user
+    });
 
     // Notify others
     socket.to(room.id).emit('user-joined', { user });
@@ -412,6 +438,9 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room) return;
 
+    const userChat = room.userChats[socket.id];
+    if (!userChat) return;
+
     const message = {
       id: generateId(),
       role: 'user',
@@ -419,10 +448,21 @@ io.on('connection', (socket) => {
       userName: socket.userName,
       timestamp: Date.now()
     };
-    room.messages.push(message);
-    io.to(roomId).emit('new-message', { message });
 
-    // Trigger Claude analysis
+    // Store in personal chat
+    userChat.messages.push(message);
+    userChat.phase.msgCount++;
+
+    // Also store in shared log for sidebar
+    room.messages.push(message);
+
+    // Send to this user only (personal chat)
+    socket.emit('new-message', { message });
+
+    // Notify others via sidebar only
+    socket.to(roomId).emit('sidebar-message', { message });
+
+    // Trigger Claude analysis (per-user)
     handleChatAnalysis(room, socket);
   });
 
@@ -451,8 +491,11 @@ io.on('connection', (socket) => {
       userName: socket.userName,
       timestamp: Date.now()
     };
+    // Add to personal chat context so Claude sees it
+    const userChat = room.userChats[socket.id];
+    if (userChat) userChat.messages.push(message);
     room.messages.push(message);
-    io.to(roomId).emit('new-message', { message });
+    io.to(roomId).emit('sidebar-message', { message });
   });
 
   socket.on('disconnect', () => {
