@@ -156,6 +156,11 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script src="renderers.js"></script>
 <script src="interactive.js"></script>
-<script src="app.js"></script>
+<!-- Modular app (load order matters) -->
+<script src="modules/state.js"></script>
+<script src="modules/chat.js"></script>
+<script src="modules/viz-picker.js"></script>
+<script src="modules/canvas.js"></script>
+<script src="modules/socket-handlers.js"></script>
 </body>
 </html>
