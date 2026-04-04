@@ -86,9 +86,15 @@ public/
 
 ### Artifact Interaction
 Each artifact card has:
-- **Action bar** (hover): Expand, Transform, Ask buttons
+- **Action bar** (hover): Expand, Transform, Ask, Copy (JSON to clipboard), PNG (screenshot via html2canvas)
 - **Inline editing** (via InteractiveLayer): double-click to edit mindmap labels, table cells; click to toggle checklist items; drag kanban cards
 - **Ask bar**: mini input at bottom of card for artifact-specific questions
+
+### Artifact Positioning
+New artifacts are placed in a 2-column grid (540px card width + 40px gap) via `calcArtifactPosition(index)`. No random overlap.
+
+### Chat Rendering
+Claude messages render as Markdown (via marked.js CDN) — bold, lists, code blocks, headings all display correctly. User messages stay plain text. After `artifact-created`, canvas auto-scrolls to the new card.
 
 ### @ Mentions
 User types `@` in chat → autocomplete dropdown shows artifacts from `state.artifacts` → selecting inserts `@Title`. Server resolves mentions to inject artifact data into Claude's context.
@@ -186,7 +192,7 @@ npm start
 
 - `ANTHROPIC_API_KEY` (required) — Anthropic API key for Claude
 - `NANOBANANA_API_KEY` (optional) — Image generation API (placeholder)
-- `PORT` (optional, default 3000)
+- `PORT` (optional, default 5000 on Replit, 3000 locally)
 
 ## Design System
 
