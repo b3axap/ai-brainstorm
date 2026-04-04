@@ -161,24 +161,6 @@ Floating cards (300-500px wide) with:
 - Full-width canvas with artifact cards (stacked vertically)
 - Bottom tab bar: "Chat" | "Canvas" (active, `--accent2`)
 
----
 
-## Agent Icons Reference (15 agents)
 
-| Agent             | ID             | Icon | Description                        |
-|-------------------|----------------|------|------------------------------------|
-| Mind Map          | `mindmap`      | `🧠`  | Visual map of ideas and connections |
-| Table             | `table`        | `📊`  | Comparison/analysis table          |
-| Presentation      | `presentation` | `🎬`  | Pitching ideas, narratives         |
-| Diagram           | `diagram`      | `🔀`  | Process flows, architecture        |
-| HTML Guide        | `html_guide`   | `📖`  | Tutorials, documentation           |
-| Image             | `image`        | `🎨`  | Visual illustrations (placeholder) |
-| Freeform          | `freeform`     | `✨`  | Creative HTML, custom widgets      |
-| Timeline          | `timeline`     | `📅`  | Roadmaps, milestones               |
-| SWOT Analysis     | `swot`         | `⚡`  | Strategic analysis                 |
-| Kanban Board      | `kanban`       | `📋`  | Task organization                  |
-| Pros & Cons       | `pros_cons`    | `⚖️`  | Tradeoff analysis                  |
-| Priority Matrix   | `matrix`       | `🎯`  | Effort/impact prioritization       |
-| Checklist         | `checklist`    | `✅`  | Action items, task lists           |
-| Donut Chart       | `donut_chart`  | `🍩`  | Proportions, distribution          |
-| Insight Card      | `quote_card`   | `💡`  | Key takeaways                      |
+<!-- Agent IDs and icons: see CLAUDE.md Agent Catalog -->

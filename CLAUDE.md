@@ -1,4 +1,4 @@
-# AI Brainstorm — Project Guide for Claude Code
+# AI Brainstorm — Project Guide
 
 ## What is this project?
 
@@ -205,6 +205,24 @@ All renderers use CSS variables for theming:
 - **Duplicate user prevention**: `join-room` checks existing socketId
 - **Message cap**: both shared and per-user histories trimmed to 200
 - **Room cleanup**: cancellable 5-min timer for empty rooms
+
+## Replit Deployment Notes
+
+**Sync workflow:** Code is developed locally → pushed to GitHub (`b3axap/ai-brainstorm`, `master`) → Replit pulls from GitHub.
+
+**If Replit code diverges from GitHub:**
+1. `git pull origin master` — pull latest
+2. `npm install` — in case deps changed
+3. Restart server
+
+**Do NOT modify on Replit without syncing back:**
+- `CLAUDE.md`, `design.md` — documentation source of truth is local/GitHub
+- `agents/*.json` — agent definitions are part of the architecture
+- `.replit`, `replit.nix` — deployment config, change only if deploy breaks
+
+**Replit Secrets required:** `ANTHROPIC_API_KEY`
+
+**Quick smoke test:** Open app → enter name → Create Room → send a message → Claude should stream a response with questions → answer → generate visualization → it appears on canvas.
 
 ## Current Limitations (MVP)
 
