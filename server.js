@@ -1,8 +1,7 @@
-require('dotenv/config');
+try { require('dotenv/config'); } catch(e) { /* dotenv optional, Replit uses Secrets */ }
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const Anthropic = require('@anthropic-ai/sdk');
 const { getAgent, getAllAgents, getAgentSummaries } = require('./agents');
 
 const app = express();
@@ -11,8 +10,19 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// --- Claude client ---
-const anthropic = new (Anthropic.default || Anthropic)();
+// --- Claude client (lazy init) ---
+let anthropic = null;
+function getAnthropicClient() {
+  if (!anthropic) {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const AnthropicClass = Anthropic.default || Anthropic;
+    anthropic = new AnthropicClass();
+  }
+  return anthropic;
+}
+
+// Health check for Replit
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // --- In-memory rooms ---
 const rooms = {};
@@ -85,7 +95,7 @@ Rules:
   try {
     let fullResponse = '';
 
-    const stream = anthropic.messages.stream({
+    const stream = getAnthropicClient().messages.stream({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1500,
       system: systemPrompt,
@@ -162,7 +172,7 @@ async function handleArtifactGeneration(room, type, userName, socket) {
     // Step 1: Ask Claude to formulate a prompt
     const { systemBase, messages } = buildContext(room);
     try {
-      const response = await anthropic.messages.create({
+      const response = await getAnthropicClient().messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 500,
         system: `${systemBase}\n\n${agent.systemPrompt}`,
@@ -206,7 +216,7 @@ async function handleArtifactGeneration(room, type, userName, socket) {
   const fullSystem = `${systemBase}\n\n${agent.systemPrompt}`;
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 3000,
       system: fullSystem,
@@ -229,7 +239,7 @@ async function handleArtifactGeneration(room, type, userName, socket) {
         } catch {
           // Retry with stricter prompt
           console.log(`Retrying ${type} generation (invalid JSON)...`);
-          const retry = await anthropic.messages.create({
+          const retry = await getAnthropicClient().messages.create({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 3000,
             system: fullSystem + '\n\nCRITICAL: Output ONLY valid JSON. No markdown, no explanation, no code fences. Just the JSON object.',
