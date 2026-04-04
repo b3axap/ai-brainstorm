@@ -78,85 +78,55 @@ async function handleChatAnalysis(room, socket, isNewIdea) {
     .map(a => `${a.id}: ${a.icon} ${a.name} — ${a.description}`)
     .join('\n');
 
-  // Per-user phase tracking
   const userChat = room.userChats[socket.id];
-  const phase = userChat ? userChat.phase : { mandatoryDone: false, mandatoryDoneAtMsg: 0, msgCount: 0 };
-  const userMsgCount = phase.msgCount;
+  const userMsgCount = userChat ? userChat.phase.msgCount : 0;
   const isFirstMessage = userMsgCount <= 1;
-  const mandatoryDone = phase.mandatoryDone;
-  const msgsSinceMandatory = mandatoryDone ? (userMsgCount - phase.mandatoryDoneAtMsg) : 0;
-  const shouldOfferCanvas = mandatoryDone && (msgsSinceMandatory === 1 || msgsSinceMandatory % 3 === 0);
 
-  let phasePrompt;
+  let contextHint = '';
   if (isNewIdea) {
-    phasePrompt = `The user is introducing a NEW, ADDITIONAL idea to the brainstorm session.
-
-Your job:
-1. **Analyze** this new idea briefly (1-2 sentences).
-2. **Connect** it to the existing brainstorm — find synergies, overlaps, or complementary angles with existing artifacts and the main idea discussed so far.
-3. **Suggest** how this new idea could be integrated (as a new branch, a separate track, a pivot, etc.).
-4. **Offer visualizations** — suggest 2-3 visualization types that would best capture this new idea and its relationship to the existing brainstorm.
-
-Always include "offer_canvas": true and "suggest" in the JSON.
-
-In the JSON block:
-- "phase": "free"
-- "suggest": array of 2-3 agent IDs
-- "offer_canvas": true
-- "questions": optional 0-2 quick clarifying questions about the new idea`;
+    contextHint = `\n\nCONTEXT: The user is introducing a NEW, ADDITIONAL idea (via the ➕ button). Analyze it, find connections with the existing brainstorm, and suggest how to integrate it. Always include "suggest" and "offer_canvas": true in the JSON.`;
   } else if (isFirstMessage) {
-    phasePrompt = `This is the user's FIRST message about their idea.
-
-STRICT STRUCTURE for your response:
-1. **SUMMARY** — Briefly restate the idea in 2-3 sentences. Show you understand the core concept and its value.
-2. **MANDATORY QUESTIONS** — You MUST ask exactly 4 questions to deeply understand the idea. These questions should cover:
-   - Target audience / users
-   - Core problem being solved or key value proposition
-   - Scale / scope (MVP vs full product, market size, etc.)
-   - Key differentiator or unique angle
-   Each question MUST have 2-3 short answer options for the user to click.
-
-In the JSON block, include:
-{"questions": [{"q": "...", "options": ["...", "..."]}, ...4 items], "phase": "mandatory"}`;
-  } else if (!mandatoryDone) {
-    phasePrompt = `The user is answering mandatory discovery questions. Acknowledge their answers briefly, then continue with any remaining mandatory questions (total should reach 4).
-
-If all 4 mandatory questions have been answered, respond with a brief synthesis of what you've learned and set phase to "mandatory_done".
-
-In the JSON block:
-- If more questions needed: {"questions": [...remaining], "phase": "mandatory"}
-- If all 4 answered: {"phase": "mandatory_done", "suggest": ["agent_id_1", "agent_id_2", "agent_id_3"]}`;
-  } else {
-    phasePrompt = `The mandatory discovery phase is complete. You are now in FREE BRAINSTORM mode.
-Respond naturally. Help develop the idea further. You may ask 0-3 follow-up questions if something new comes up.
-
-${shouldOfferCanvas ? 'IMPORTANT: Include "offer_canvas": true and "suggest": [...] in the JSON.' : ''}
-
-CANVAS COMMANDS:
-When the user's message CLEARLY intends to create, update, or transform a visualization, include "canvas_action" in your JSON.
-Examples:
-- "make a mindmap of this" → canvas_action: {"intent":"create", "artifact_type":"mindmap"}
-- "add a marketing branch to the mindmap" → canvas_action: {"intent":"update", "target_id":"<id>", "instruction":"add marketing branch"}
-- "convert the table to a presentation" → canvas_action: {"intent":"transform", "target_id":"<id>", "artifact_type":"presentation"}
-ONLY include canvas_action when the intent is UNAMBIGUOUS. Normal discussion does NOT get canvas_action.
-
-In the JSON block:
-- "phase": "free"
-- "questions": optional 0-3 question objects
-${shouldOfferCanvas ? '- "suggest": array of 2-3 agent IDs\n- "offer_canvas": true' : '- Do NOT include "suggest" unless you also include canvas_action or offer_canvas'}
-- "canvas_action": optional — only when the user clearly wants to affect the canvas`;
+    contextHint = `\n\nCONTEXT: This is the user's FIRST message. Show you get the idea, share your own angle on it, and ask what you genuinely need to know.`;
   }
 
   const systemPrompt = `${systemBase}
+${contextHint}
 
-RESPONSE STRUCTURE:
+YOU ARE A CREATIVE BRAINSTORMING PARTNER.
 
-${phasePrompt}
+Behave like a smart, engaged colleague — not a questionnaire bot. Be natural and adaptive.
+
+GUIDELINES (not rigid rules):
+
+1. FIRST MESSAGE:
+   - Show you understand the core idea (1-2 sentences, casual, not a formal "summary")
+   - Add your own thought — an interesting angle, a non-obvious observation, a "what if..."
+   - Ask 1-4 questions that you GENUINELY need answered to help further. If the idea is already detailed, you can ask 0 questions and jump straight to suggesting visualizations.
+
+2. ONGOING CONVERSATION:
+   - Be an active participant: develop ideas, suggest alternatives, play devil's advocate when useful
+   - Ask questions ONLY when you actually need clarification (0-2 at a time)
+   - Suggest visualizations whenever enough context has accumulated to make one useful — don't wait for a special moment
+   - When suggesting a visualization, briefly say WHY it would help right now (one sentence)
+
+3. QUESTIONS FORMAT:
+   - If a question has obvious answer variants (yes/no, a few clear options), include them as clickable options
+   - Format: {"q": "question text", "options": ["Option A", "Option B", "Option C"]}
+   - If the question is open-ended with no obvious options, just include the question as a string: "What's your main concern?"
+   - The user can ALWAYS type their own answer regardless, options are just shortcuts
+   - Don't force options where they don't make sense
+
+4. CANVAS ACTIONS:
+   When the user CLEARLY wants to create, update, or transform a visualization, include "canvas_action":
+   - "make a mindmap" → canvas_action: {"intent":"create", "artifact_type":"mindmap"}
+   - "update the table" → canvas_action: {"intent":"update", "target_id":"<id>", "instruction":"..."}
+   - "convert to presentation" → canvas_action: {"intent":"transform", "target_id":"<id>", "artifact_type":"presentation"}
+   Only when intent is UNAMBIGUOUS. Normal discussion does NOT get canvas_action.
 
 AVAILABLE VISUALIZATION TYPES:
 ${agentList}
 
-CHOOSING THE RIGHT VISUALIZATION:
+WHEN TO SUGGEST WHAT:
 - Comparing options? → table, pros_cons, matrix
 - Breaking down a concept? → mindmap
 - Planning phases? → timeline, kanban
@@ -165,27 +135,28 @@ CHOOSING THE RIGHT VISUALIZATION:
 - Custom/interactive? → freeform
 - Quick insight? → quote_card
 
-JSON FORMAT (must be the LAST thing in your response, on its own line):
-- "phase": "mandatory" | "mandatory_done" | "free"
-- "questions": array of question objects with "q" and "options" (2-3 options each)
-- "suggest": array of 2-3 agent IDs (required when phase is "mandatory_done" or "free")
-- "offer_canvas": true (only when explicitly told to include it above)
+JSON BLOCK (LAST thing in your response, on its own line):
+All fields are OPTIONAL — include only what's relevant:
+- "questions": array of question objects (with "q" + "options") or plain strings
+- "suggest": array of 2-3 agent IDs — when you think it's time to visualize
+- "offer_canvas": true — include alongside "suggest" to show the visualization picker
+- "canvas_action": object — only for explicit canvas commands
 
 Examples:
-{"questions": [{"q": "Who is the target audience?", "options": ["B2B", "B2C", "Both"]}], "phase": "mandatory"}
+{"questions": [{"q": "Who is this for?", "options": ["B2B", "B2C", "Both"]}, "What problem does it solve?"]}
 
-{"phase": "mandatory_done", "suggest": ["mindmap", "table", "diagram"]}
+{"suggest": ["mindmap", "table"], "offer_canvas": true}
 
-{"suggest": ["swot", "pros_cons"], "phase": "free", "offer_canvas": true}
+{"questions": [{"q": "Ready to visualize?", "options": ["Yes, let's go", "Not yet, more questions"]}], "suggest": ["swot", "diagram"], "offer_canvas": true}
 
-{"questions": [{"q": "Have you considered monetization?", "options": ["Subscription", "Freemium", "One-time"]}], "suggest": ["table", "mindmap"], "phase": "free"}
+{"canvas_action": {"intent": "create", "artifact_type": "mindmap"}}
+
+{}
 
 Rules:
-- The JSON block must be the LAST thing in your response, on its own line.
-- During mandatory phase: ALWAYS include exactly 4 questions on first message.
-- During free phase: questions are optional (0-3).
-- Keep text concise. No fluff.
-- Use Russian language if the user writes in Russian.`;
+- JSON block must be the LAST line.
+- Use the same language the user writes in.
+- Be concise. No fluff. No filler questions.`;
 
   // Abort any previous in-flight stream for this socket
   const prevAbort = activeAborts.get(socket.id);
@@ -214,52 +185,29 @@ Rules:
 
     await stream.finalMessage();
 
-    // Parse JSON block at end
+    // Parse JSON block at end of response
     let suggestedTypes = [];
     let clarifyQuestions = [];
-    let phase = '';
     let offerCanvas = false;
     let canvasAction = null;
 
-    // Try to find any JSON block at the end of the response
-    const jsonMatch = fullResponse.match(/\{[\s\S]*"phase"\s*:[\s\S]*\}$/m)
-      || fullResponse.match(/\{[^{}]*"phase"\s*:[^{}]*\}/);
+    // Find the last JSON block in the response
+    const jsonMatch = fullResponse.match(/\{[^{}]*(?:"suggest"|"questions"|"offer_canvas"|"canvas_action")[^{}]*\}/)
+      || fullResponse.match(/\{\s*\}$/m);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
         suggestedTypes = parsed.suggest || [];
         clarifyQuestions = parsed.questions || [];
-        phase = parsed.phase || '';
         offerCanvas = parsed.offer_canvas || false;
         canvasAction = parsed.canvas_action || null;
       } catch (e) { /* ignore parse error */ }
     }
 
-    // Fallback: try to find any JSON with questions or suggest
-    if (!phase) {
-      const fallback = fullResponse.match(/\{[^{}]*"(?:suggest|questions)"\s*:\s*\[[^\]]*\][^{}]*\}/);
-      if (fallback) {
-        try {
-          const parsed = JSON.parse(fallback[0]);
-          suggestedTypes = parsed.suggest || [];
-          clarifyQuestions = parsed.questions || [];
-        } catch(e) {}
-      }
-    }
-
-    // Track mandatory phase completion (per-user)
-    if (phase === 'mandatory_done' && userChat && !userChat.phase.mandatoryDone) {
-      userChat.phase.mandatoryDone = true;
-      userChat.phase.mandatoryDoneAtMsg = userChat.phase.msgCount;
-      offerCanvas = true;
-    }
-
     // Clean response text (remove JSON block)
     const cleanResponse = fullResponse
-      .replace(/\{[\s\S]*"phase"\s*:[\s\S]*\}$/m, '')
-      .replace(/\{[^{}]*"phase"\s*:[^{}]*\}/, '')
-      .replace(/\{[^{}]*"suggest"\s*:\s*\[[^\]]*\][^{}]*\}/, '')
-      .replace(/\{[^{}]*"questions"\s*:\s*\[[^\]]*\][^{}]*\}/, '')
+      .replace(/\{[^{}]*(?:"suggest"|"questions"|"offer_canvas"|"canvas_action")[^{}]*\}/, '')
+      .replace(/\{\s*\}$/m, '')
       .trim();
 
     // Store in user's personal chat (with cap)
@@ -283,7 +231,6 @@ Rules:
       fullMessage: cleanResponse,
       suggestedTypes: suggestedTypes,
       clarifyQuestions: clarifyQuestions,
-      phase: phase,
       offerCanvas: offerCanvas,
       canvasAction: canvasAction
     });

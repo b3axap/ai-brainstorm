@@ -684,7 +684,7 @@ socket.on('claude-chunk', ({ chunk }) => {
   appendStream(chunk);
 });
 
-socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase, offerCanvas, canvasAction }) => {
+socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, offerCanvas, canvasAction }) => {
   endStreaming(fullMessage);
   state.generating = false;
 
