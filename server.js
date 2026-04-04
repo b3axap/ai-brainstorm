@@ -163,6 +163,14 @@ Rules:
 - Keep text concise. No fluff.
 - Use Russian language if the user writes in Russian.`;
 
+  // Abort any previous in-flight stream for this socket
+  const prevAbort = activeAborts.get(socket.id);
+  if (prevAbort) prevAbort.abort();
+
+  const abortController = new AbortController();
+  activeAborts.set(socket.id, abortController);
+  activeLocks.set(socket.id, true);
+
   try {
     let fullResponse = '';
 
@@ -170,10 +178,12 @@ Rules:
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1500,
       system: systemPrompt,
-      messages: messages
+      messages: messages,
+      signal: abortController.signal
     });
 
     stream.on('text', (text) => {
+      if (abortController.signal.aborted) return;
       fullResponse += text;
       socket.emit('claude-chunk', { roomId: room.id, chunk: text });
     });
@@ -226,7 +236,7 @@ Rules:
       .replace(/\{[^{}]*"questions"\s*:\s*\[[^\]]*\][^{}]*\}/, '')
       .trim();
 
-    // Store in user's personal chat
+    // Store in user's personal chat (with cap)
     const assistantMsg = {
       id: generateId(),
       role: 'assistant',
@@ -234,8 +244,12 @@ Rules:
       userName: 'Claude',
       timestamp: Date.now()
     };
-    if (userChat) userChat.messages.push(assistantMsg);
+    if (userChat) {
+      userChat.messages.push(assistantMsg);
+      if (userChat.messages.length > MAX_MESSAGES) userChat.messages.splice(0, userChat.messages.length - MAX_MESSAGES);
+    }
     room.messages.push(assistantMsg);
+    if (room.messages.length > MAX_MESSAGES) room.messages.splice(0, room.messages.length - MAX_MESSAGES);
 
     // Send only to this user
     socket.emit('claude-done', {
@@ -248,11 +262,18 @@ Rules:
     });
 
   } catch (error) {
+    if (error.name === 'AbortError' || abortController.signal.aborted) {
+      console.log('Claude stream aborted for socket:', socket.id);
+      return;
+    }
     console.error('Claude chat error:', error.message);
-    io.to(room.id).emit('generation-error', {
+    socket.emit('generation-error', {
       roomId: room.id,
       message: 'Failed to get Claude response: ' + error.message
     });
+  } finally {
+    activeLocks.delete(socket.id);
+    activeAborts.delete(socket.id);
   }
 }
 
@@ -399,13 +420,21 @@ io.on('connection', (socket) => {
       rooms[id] = room;
     }
 
-    const user = {
+    // Prevent duplicate user entries for same socket
+    const existingUser = room.users.find(u => u.socketId === socket.id);
+    const user = existingUser || {
       socketId: socket.id,
       name: userName,
       color: COLORS[room.users.length % COLORS.length]
     };
-    room.users.push(user);
+    if (!existingUser) room.users.push(user);
     socket.join(room.id);
+
+    // Cancel any pending room cleanup
+    if (room._cleanupTimer) {
+      clearTimeout(room._cleanupTimer);
+      room._cleanupTimer = null;
+    }
 
     // Initialize per-user chat
     if (!room.userChats[socket.id]) {
@@ -441,6 +470,12 @@ io.on('connection', (socket) => {
     const userChat = room.userChats[socket.id];
     if (!userChat) return;
 
+    // Reject if a Claude call is already in-flight for this user
+    if (activeLocks.get(socket.id)) {
+      socket.emit('generation-error', { roomId, message: 'Please wait for the current response to finish.' });
+      return;
+    }
+
     const message = {
       id: generateId(),
       role: 'user',
@@ -449,12 +484,14 @@ io.on('connection', (socket) => {
       timestamp: Date.now()
     };
 
-    // Store in personal chat
+    // Store in personal chat (with cap)
     userChat.messages.push(message);
+    if (userChat.messages.length > MAX_MESSAGES) userChat.messages.splice(0, userChat.messages.length - MAX_MESSAGES);
     userChat.phase.msgCount++;
 
-    // Also store in shared log for sidebar
+    // Also store in shared log for sidebar (with cap)
     room.messages.push(message);
+    if (room.messages.length > MAX_MESSAGES) room.messages.splice(0, room.messages.length - MAX_MESSAGES);
 
     // Send to this user only (personal chat)
     socket.emit('new-message', { message });
@@ -499,14 +536,22 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    // Abort any in-flight Claude stream for this socket
+    const abort = activeAborts.get(socket.id);
+    if (abort) abort.abort();
+    activeLocks.delete(socket.id);
+    activeAborts.delete(socket.id);
+
     const roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
-      rooms[roomId].users = rooms[roomId].users.filter(u => u.socketId !== socket.id);
+      const room = rooms[roomId];
+      room.users = room.users.filter(u => u.socketId !== socket.id);
       io.to(roomId).emit('user-left', { socketId: socket.id });
 
-      // Clean up empty rooms after 5 minutes
-      if (rooms[roomId].users.length === 0) {
-        setTimeout(() => {
+      // Clean up empty rooms after 5 minutes (one timer per room, cancellable on join)
+      if (room.users.length === 0) {
+        if (room._cleanupTimer) clearTimeout(room._cleanupTimer);
+        room._cleanupTimer = setTimeout(() => {
           if (rooms[roomId] && rooms[roomId].users.length === 0) {
             delete rooms[roomId];
             console.log(`Room ${roomId} cleaned up`);

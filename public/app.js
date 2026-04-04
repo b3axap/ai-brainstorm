@@ -18,9 +18,36 @@ const state = {
 };
 
 // Load agents list
-fetch('/api/agents').then(r => r.json()).then(agents => {
-  state.agents = agents;
-  populateAgentGrid();
+fetch('/api/agents')
+  .then(r => r.json())
+  .then(agents => {
+    state.agents = agents;
+    populateAgentGrid();
+  })
+  .catch(err => {
+    console.error('Failed to load agents:', err);
+    showToast('Failed to load visualization types');
+  });
+
+// --- Socket.IO connection handling ---
+socket.on('connect_error', () => {
+  showToast('Connection error — retrying...');
+});
+
+socket.on('disconnect', (reason) => {
+  state.generating = false;
+  document.getElementById('typingIndicator').classList.remove('visible');
+  if (reason !== 'io client disconnect') {
+    showToast('Disconnected — reconnecting...');
+  }
+});
+
+socket.on('reconnect', () => {
+  showToast('Reconnected!');
+  // Re-join room if we were in one
+  if (state.roomId && state.userName) {
+    socket.emit('join-room', { userName: state.userName, roomId: state.roomId });
+  }
 });
 
 // --- Screen switching ---
@@ -104,9 +131,11 @@ function addChatMessage(message) {
 
 // Streaming: Claude response building
 let streamingMsgId = null;
+let streamingActive = false;
 
 function startStreaming() {
   streamingMsgId = 'stream-' + Date.now();
+  streamingActive = true;
   const container = document.getElementById('chatMessages');
   const div = document.createElement('div');
   div.className = 'message assistant';
@@ -121,26 +150,27 @@ function startStreaming() {
 }
 
 function appendStream(chunk) {
-  if (!streamingMsgId) startStreaming();
-  const msgEl = document.getElementById(`msg-${streamingMsgId}`);
+  if (!streamingActive) startStreaming();
+  const msgEl = streamingMsgId ? document.getElementById(`msg-${streamingMsgId}`) : null;
   if (msgEl) {
     const bubble = msgEl.querySelector('.msg-bubble');
-    bubble.textContent += chunk;
-    document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+    if (bubble) bubble.textContent += chunk;
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 }
 
 function endStreaming(fullMessage) {
   document.getElementById('typingIndicator').classList.remove('visible');
-  // Replace streaming message with clean version
   if (streamingMsgId) {
     const msgEl = document.getElementById(`msg-${streamingMsgId}`);
     if (msgEl) {
       const bubble = msgEl.querySelector('.msg-bubble');
-      bubble.textContent = fullMessage;
+      if (bubble) bubble.textContent = fullMessage;
     }
   }
   streamingMsgId = null;
+  streamingActive = false;
 }
 
 // --- Canvas ---
@@ -302,33 +332,33 @@ function renderArtifactCard(artifact) {
 
 function setupDrag(card, artifact) {
   const head = card.querySelector('.artifact-head');
-  let dragging = false, startX, startY, origLeft, origTop;
+  let startX, startY, origLeft, origTop;
+
+  function onMouseMove(e) {
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    card.style.left = (origLeft + dx) + 'px';
+    card.style.top = (origTop + dy) + 'px';
+  }
+
+  function onMouseUp() {
+    card.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    const pos = { x: parseInt(card.style.left) || 0, y: parseInt(card.style.top) || 0 };
+    socket.emit('move-artifact', { roomId: state.roomId, artifactId: artifact.id, position: pos });
+  }
 
   head.onmousedown = (e) => {
-    dragging = true;
     card.classList.add('dragging');
     startX = e.clientX;
     startY = e.clientY;
     origLeft = parseInt(card.style.left) || 0;
     origTop = parseInt(card.style.top) || 0;
     e.preventDefault();
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   };
-
-  document.addEventListener('mousemove', (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    card.style.left = (origLeft + dx) + 'px';
-    card.style.top = (origTop + dy) + 'px';
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (!dragging) return;
-    dragging = false;
-    card.classList.remove('dragging');
-    const pos = { x: parseInt(card.style.left), y: parseInt(card.style.top) };
-    socket.emit('move-artifact', { roomId: state.roomId, artifactId: artifact.id, position: pos });
-  });
 }
 
 // --- Update user lists ---
@@ -405,7 +435,9 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase
   state.generating = false;
 
   const container = document.getElementById('chatMessages');
-  const lastMsg = container.querySelector('.message:last-child');
+  const lastMsg = streamingMsgId === null
+    ? container.querySelector('.message.assistant:last-child') || container.querySelector('.message:last-child')
+    : null;
   if (!lastMsg) return;
 
   const hasQuestions = clarifyQuestions && clarifyQuestions.length > 0;
@@ -474,15 +506,22 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, phase
       if (!agent) return;
       const btn = document.createElement('button');
       btn.className = 'suggest-btn';
+      btn.dataset.agentType = typeId;
       btn.innerHTML = `${agent.icon} ${agent.name}`;
-      btn.onclick = () => {
-        btn.innerHTML = `<span class="auto-spinner"></span> ${agent.name}...`;
-        btn.disabled = true;
-        socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
-        showToast(`Generating ${agent.name}...`);
-      };
       quickBtns.appendChild(btn);
     });
+    // Event delegation for suggest buttons
+    quickBtns.onclick = (e) => {
+      const btn = e.target.closest('.suggest-btn');
+      if (!btn || btn.disabled) return;
+      const typeId = btn.dataset.agentType;
+      const agent = state.agents.find(a => a.id === typeId);
+      if (!agent) return;
+      btn.innerHTML = `<span class="auto-spinner"></span> ${agent.name}...`;
+      btn.disabled = true;
+      socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
+      showToast(`Generating ${agent.name}...`);
+    };
     canvasOffer.appendChild(quickBtns);
 
     // "Push to Canvas" button opens full picker
@@ -511,14 +550,11 @@ socket.on('artifact-created', ({ artifact }) => {
   state.artifacts.push(artifact);
   state.generating = false;
   renderArtifactCard(artifact);
-
-  showToast(`${artifact.icon} ${artifact.title} created!`);
-
-  // Re-enable generation for next artifact
-  state.generating = false;
+  showToast(`${artifact.icon || '📄'} ${artifact.title || 'Untitled'} created!`);
 });
 
 socket.on('artifact-moved', ({ artifactId, position }) => {
+  if (!position) return;
   const card = document.getElementById(`artifact-${artifactId}`);
   if (card) {
     card.style.left = position.x + 'px';
