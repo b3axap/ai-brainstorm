@@ -126,7 +126,7 @@ Agents are JSON files auto-loaded from `agents/` directory. Each has: id, name, 
 
 **Client → Server:**
 - `join-room { roomId?, userName }` — Create or join room
-- `send-message { roomId, content, isNewIdea? }` — Chat message → triggers Claude (isNewIdea flag activates new-idea agent)
+- `send-message { roomId, content, isNewIdea?, files? }` — Chat message → triggers Claude. `isNewIdea` activates new-idea agent. `files` is array of `{name, type, data (base64), isImage}` (max 5, max 10MB each). Images sent to Claude as vision; text files decoded and inlined.
 - `generate-artifact { roomId, type, referenceIds?, customPrompt? }` — Generate visualization (optionally referencing other artifacts)
 - `move-artifact { roomId, artifactId, position }` — Drag artifact
 - `artifact-action { roomId, artifactId, action: 'expand'|'transform'|'ask', payload? }` — Artifact manipulation

@@ -6,7 +6,7 @@ const { getAgent, getAgentSummaries } = require('./agents');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { maxHttpBufferSize: 15 * 1024 * 1024 }); // 15MB for file uploads
 
 app.use(express.static('public'));
 
@@ -72,12 +72,34 @@ ${artifactList}
 
 Your job is to help users develop their ideas, make connections between different perspectives, and suggest useful visualizations.`;
 
-  // Use per-user chat history
+  // Use per-user chat history, with multimodal support for files
   const userChat = room.userChats[socketId];
-  let msgs = (userChat ? userChat.messages : []).map(m => ({
-    role: m.role === 'assistant' ? 'assistant' : 'user',
-    content: m.content
-  }));
+  let msgs = (userChat ? userChat.messages : []).map(m => {
+    const role = m.role === 'assistant' ? 'assistant' : 'user';
+
+    // Build multimodal content if files are attached
+    if (m.files && m.files.length > 0 && role === 'user') {
+      const contentBlocks = [];
+      m.files.forEach(f => {
+        if (f.isImage && f.data) {
+          contentBlocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: f.type, data: f.data }
+          });
+        } else if (f.data) {
+          // Text files: decode and include as text
+          try {
+            const decoded = Buffer.from(f.data, 'base64').toString('utf-8');
+            contentBlocks.push({ type: 'text', text: `[File: ${f.name}]\n${decoded}` });
+          } catch { /* skip unreadable files */ }
+        }
+      });
+      if (m.content) contentBlocks.push({ type: 'text', text: m.content });
+      return { role, content: contentBlocks.length > 0 ? contentBlocks : m.content };
+    }
+
+    return { role, content: m.content };
+  });
 
   // Trim if too long: keep first 5 + last 30
   if (msgs.length > 50) {
@@ -551,7 +573,7 @@ io.on('connection', (socket) => {
     socket.userName = userName;
   });
 
-  socket.on('send-message', ({ roomId, content, isNewIdea }) => {
+  socket.on('send-message', ({ roomId, content, isNewIdea, files }) => {
     const room = rooms[roomId];
     if (!room) return;
 
@@ -564,12 +586,19 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Validate and cap files (max 5 files, max 10MB each)
+    let validFiles = null;
+    if (files && Array.isArray(files) && files.length > 0) {
+      validFiles = files.slice(0, 5).filter(f => f.data && f.type && f.data.length < 10 * 1024 * 1024 * 1.37);
+    }
+
     const message = {
       id: generateId(),
       role: 'user',
       content: content,
       userName: socket.userName,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      files: validFiles || undefined
     };
 
     // Store in personal chat (with cap)
@@ -577,15 +606,16 @@ io.on('connection', (socket) => {
     if (userChat.messages.length > MAX_MESSAGES) userChat.messages.splice(0, userChat.messages.length - MAX_MESSAGES);
     userChat.phase.msgCount++;
 
-    // Also store in shared log for sidebar (with cap)
-    room.messages.push(message);
+    // Also store in shared log for sidebar (with cap, without file data to save memory)
+    const sharedMsg = { ...message, files: validFiles ? validFiles.map(f => ({ name: f.name, type: f.type, isImage: f.isImage })) : undefined };
+    room.messages.push(sharedMsg);
     if (room.messages.length > MAX_MESSAGES) room.messages.splice(0, room.messages.length - MAX_MESSAGES);
 
     // Send to this user only (personal chat)
     socket.emit('new-message', { message });
 
-    // Notify others via sidebar only
-    socket.to(roomId).emit('sidebar-message', { message });
+    // Notify others via sidebar only (without file data)
+    socket.to(roomId).emit('sidebar-message', { message: sharedMsg });
 
     // Trigger Claude analysis (per-user)
     handleChatAnalysis(room, socket, isNewIdea);

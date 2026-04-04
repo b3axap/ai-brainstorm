@@ -98,12 +98,20 @@ document.getElementById('chatInput').onkeypress = (e) => {
 function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const content = input.value.trim();
-  if (!content || state.generating) return;
+  const hasFiles = state.pendingFiles.length > 0;
+  if ((!content && !hasFiles) || state.generating) return;
   input.value = '';
   closeMentionDropdown();
 
   const isNewIdea = state.newIdeaMode || false;
-  socket.emit('send-message', { roomId: state.roomId, content, isNewIdea });
+  const files = hasFiles ? [...state.pendingFiles] : undefined;
+  socket.emit('send-message', { roomId: state.roomId, content: content || '(attached files)', isNewIdea, files });
+
+  // Clear pending files
+  if (hasFiles) {
+    state.pendingFiles = [];
+    renderFilePreview();
+  }
 
   // Reset new-idea mode after sending
   if (state.newIdeaMode) {
@@ -122,8 +130,21 @@ function addChatMessage(message) {
 
   const nameLabel = message.role === 'assistant' ? 'Claude' : message.userName || 'User';
   const bubbleContent = message.role === 'assistant' ? renderMarkdown(message.content) : escHtml(message.content);
+
+  let filesHtml = '';
+  if (message.files && message.files.length > 0) {
+    const chips = message.files.map(f => {
+      if (f.isImage) {
+        return `<div class="msg-file"><img class="msg-file-thumb" src="data:${f.type};base64,${f.data}" alt="${escHtml(f.name)}"></div>`;
+      }
+      return `<div class="msg-file"><span class="msg-file-icon">📄</span><span class="msg-file-name">${escHtml(f.name)}</span></div>`;
+    }).join('');
+    filesHtml = `<div class="msg-files">${chips}</div>`;
+  }
+
   div.innerHTML = `
     <div class="msg-header"><span class="name">${escHtml(nameLabel)}</span></div>
+    ${filesHtml}
     <div class="msg-bubble">${bubbleContent}</div>
   `;
   container.appendChild(div);
@@ -223,9 +244,79 @@ function endStreaming(fullMessage) {
 })();
 
 // --- Chat Action Buttons ---
+// --- File Attachment ---
+state.pendingFiles = [];
+
 document.getElementById('attachBtn').onclick = () => {
-  showToast('File upload coming soon');
+  document.getElementById('fileInput').click();
 };
+
+document.getElementById('fileInput').onchange = (e) => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  files.forEach(file => {
+    if (file.size > 10 * 1024 * 1024) {
+      showToast(`${file.name} is too large (max 10MB)`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      const isImage = file.type.startsWith('image/');
+      state.pendingFiles.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: base64,
+        isImage
+      });
+      renderFilePreview();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Reset input so same file can be re-selected
+  e.target.value = '';
+};
+
+function renderFilePreview() {
+  let container = document.getElementById('filePreviewBar');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'filePreviewBar';
+    container.className = 'file-preview-bar';
+    const chatInput = document.querySelector('.chat-input');
+    chatInput.parentNode.insertBefore(container, chatInput);
+  }
+
+  container.innerHTML = '';
+  if (state.pendingFiles.length === 0) {
+    container.remove();
+    return;
+  }
+
+  state.pendingFiles.forEach((file, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    if (file.isImage) {
+      chip.innerHTML = `<img class="file-chip-thumb" src="data:${file.type};base64,${file.data}" alt="">`;
+    } else {
+      chip.innerHTML = `<span class="file-chip-icon">📄</span>`;
+    }
+    chip.innerHTML += `<span class="file-chip-name">${escHtml(file.name)}</span>`;
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'file-chip-remove';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = () => {
+      state.pendingFiles.splice(idx, 1);
+      renderFilePreview();
+    };
+    chip.appendChild(removeBtn);
+    container.appendChild(chip);
+  });
+}
 
 document.getElementById('newIdeaBtn').onclick = () => {
   state.newIdeaMode = !state.newIdeaMode;
