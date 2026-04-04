@@ -107,12 +107,14 @@ Every Claude call includes full room context via `buildContext(room, socketId)`:
 - List of existing artifacts (type + title + id)
 - List of active users
 
-### Chat Flow Phases
-1. **Mandatory** (first message): Claude asks exactly 4 discovery questions with clickable options
-2. **Mandatory answering**: User answers, Claude continues until all 4 answered
-3. **Mandatory done**: Claude offers canvas visualization (one-time), transitions to free mode
-4. **Free brainstorm**: Open conversation, canvas_action support, suggestions only when contextually obvious
-5. **New idea** (➕ button): User introduces an additional idea — Claude analyzes it, finds connections with existing brainstorm, and suggests visualizations
+### Chat Behavior (Adaptive, No Rigid Phases)
+Claude acts as a creative brainstorming partner, not a questionnaire. One adaptive prompt governs all interactions:
+
+- **First message**: Claude shows it understood the idea (1-2 sentences), adds its own angle or observation, asks 1-4 questions only if genuinely needed. If the idea is already detailed, can skip questions and suggest visualizations immediately.
+- **Ongoing**: Claude develops ideas, suggests alternatives, plays devil's advocate. Questions only when actually needed (0-2 at a time). Visualizations suggested whenever enough context has accumulated — no timer or counter.
+- **New idea** (➕ button): User introduces an additional idea. Claude analyzes it, finds connections with existing brainstorm, and suggests integrations + visualizations.
+- **Questions with options**: If a question has obvious answer variants (yes/no, clear choices), Claude provides clickable option buttons. Open-ended questions have no options. The user can always type a custom answer regardless.
+- **JSON is fully optional**: Claude includes `questions`, `suggest`, `offer_canvas`, `canvas_action` only when relevant. All fields are optional. No phase tracking.
 
 ### Agent System
 Agents are JSON files auto-loaded from `agents/` directory. Each has: id, name, icon, description, keywords, renderer, systemPrompt, outputExample, externalAPI.
@@ -136,7 +138,7 @@ Agents are JSON files auto-loaded from `agents/` directory. Each has: id, name, 
 - `user-joined / user-left` — Presence updates
 - `new-message { message }` — Chat message
 - `claude-chunk { chunk }` — Streaming token
-- `claude-done { fullMessage, suggestedTypes, clarifyQuestions, phase, offerCanvas, canvasAction }` — Final response
+- `claude-done { fullMessage, suggestedTypes, clarifyQuestions, offerCanvas, canvasAction }` — Final response (all fields optional)
 - `artifact-created { artifact }` — New artifact for canvas
 - `artifact-updated { artifactId, data, title }` — Updated artifact (re-render)
 - `artifact-moved { artifactId, position }` — Position sync
@@ -156,7 +158,7 @@ rooms[roomId] = {
   userChats: {          // per-user private chat
     [socketId]: {
       messages: [],     // capped at 200
-      phase: { mandatoryDone, mandatoryDoneAtMsg, msgCount }
+      phase: { msgCount }
     }
   }
 }
