@@ -12,7 +12,7 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 // --- Claude client ---
-const anthropic = new Anthropic.default();
+const anthropic = new (Anthropic.default || Anthropic)();
 
 // --- In-memory rooms ---
 const rooms = {};
@@ -359,6 +359,6 @@ app.get('/api/agents', (req, res) => {
 
 // --- Start ---
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`AI Brainstorm server running on port ${PORT}`);
 });
