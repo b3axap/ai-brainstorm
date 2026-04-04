@@ -23,7 +23,7 @@
 | Token    | Hex       | Usage                          |
 |----------|-----------|--------------------------------|
 | `--text` | `#e4e7f0` | Primary text, headings         |
-| `--text2`| `#8b90a0` | Labels, secondary text, hints  |
+| `--text2`| `#9ea3b5` | Labels, secondary text, hints  |
 
 ### Accent Colors
 | Token      | Hex       | Usage                          |
@@ -98,8 +98,9 @@
 
 ### Inputs
 - **Default:** `--surface2` bg, `--border` border, 8px radius, `--text` color
-- **Focus:** border-color changes to `--accent`
-- **Placeholder:** `--text2` color
+- **Focus:** border-color `--accent` + box-shadow ring `rgba(108,92,231,.3)`
+- **Focus-visible (all elements):** `outline: 2px solid --accent2`, `outline-offset: 2px`
+- **Placeholder:** `#6a7086` (dedicated color, no opacity)
 
 ### Cards
 - **Surface Card:** `--surface` bg, `--border` border, 10px radius, `--shadow`
@@ -113,54 +114,34 @@
 
 ## Screens
 
-> **Figma file:** https://www.figma.com/design/JvFIp4Sm1myT84L8898BWV/AI-Brainstorm-UI-Design
+> **Figma file:** https://www.figma.com/design/hWXymOh1105g7U1u9PTwnV
 
-### 1. Landing Page (1440x900)
-Centered card (400px wide) on `--bg` background. Contains: title with brain emoji, subtitle "Collaborative AI-powered idea visualization", name input with uppercase label, "Create New Room" primary button (full-width), "or join existing" divider, room code input (monospace, uppercase) + "Join Room" button.
+### App Screens
 
-### 2. Workspace — Split-View (1440x900)
-- **Header (48px):** room code badge (monospace, copyable), user list with names, spacer, "+ New Visualization" button (primary)
-- **Layout:** CSS Grid `350px | 4px | 1fr` — chat panel (left) + resize handle + canvas panel (right)
-- **Chat Panel (left):**
-  - Messages area with alternating user (right-aligned, `--accent` bg) and Claude (left-aligned, `--surface2` bg) bubbles
-  - Clarifying questions with `?` prefix in `--accent` color + clickable option pill buttons
-  - Canvas offer section (green-tinted) with suggested visualization buttons + "Choose more visualizations..." link
-  - Canvas action buttons (green border, confirm intent)
-  - Typing indicator in `--accent2`
-  - Input bar: text input + "Send" primary button
-- **Canvas Panel (right):**
-  - Dot-grid background (`--surface3` dots, 24px spacing)
-  - 4000x4000px virtual canvas, scrollable
-  - Artifact cards positioned absolutely
+| Frame | Description |
+|-------|-------------|
+| `00 — Landing Screen` | Centered card (400px): name input, Create Room, join with code |
+| `00 — Workspace (Split-View)` | Main screen 1440×900: chat left (350px) + canvas right, header with room code `<button>`, no header buttons — all actions via chat input |
+| `00 — Viz Picker Modal` | Overlay: 4×4 agent grid with checkboxes, pre-selected suggestions, Generate (N) |
+| `00 — Mobile: Chat View` | 375×812: chat with option pills, bottom tab bar |
+| `00 — Mobile: Canvas View` | 375×812: artifact cards on grid, bottom tab bar |
 
-### 3. Visualization Picker Modal (560px)
-Overlay modal with:
-- Title: "Choose Visualizations" with subtitle
-- 4-column grid of agent cards (icon + name, checkbox, selected state with purple border)
-- Pre-selected suggestions marked "recommended"
-- Reference chips section (existing artifacts to use as context)
-- Custom viz checkbox + text input
-- Footer: Cancel + "Generate (N)" primary button
+### Chat Input
+Layout: `[📎 Attach] [➕ New Idea] [text input] [Send]`
+- 📎 and ➕ are 32×32 circle buttons (transparent bg, `--border` stroke)
+- **New Idea Mode**: ➕ active → input border turns green (`#00b894`), "New Idea" badge appears
 
-### 4. Artifact Cards
-Floating cards (300-500px wide) with:
-- **Action bar** (hover, above card): Expand / Transform / Ask buttons
-- **Header:** agent icon + title + "by Author" label
-- **Body:** rendered content (SVG, HTML, charts)
-- **Ask bar** (toggle): mini input + Ask button at card bottom
-- **Transform dropdown:** list of all other agent types
-- **States:** default, hover (purple border glow), dragging (opacity 0.9, z-index 100), updating (spinner overlay)
+### Interaction States
 
-### 5. Mobile: Chat View (375x812)
-- Room code badge (top-left)
-- Full-width chat messages
-- Input bar with Send button
-- Bottom tab bar: "Chat" (active, `--accent2`) | "Canvas"
+| Frame | Description |
+|-------|-------------|
+| `00 — Chat Input: New Idea Mode` | Green border + badge on input after pressing ➕ |
+| `00 — Inline Editing States` | 5 states: mind map label edit, table cell edit, checklist toggle, kanban drag, presentation bullet edit |
+| `00 — Empty Canvas State` | Grid + centered "No visualizations yet" placeholder |
+| `00 — @ Mention Dropdown` | Autocomplete filtering artifacts, arrow/Enter/Escape navigation |
 
-### 6. Mobile: Canvas View (375x812)
-- Full-width canvas with artifact cards (stacked vertically)
-- Bottom tab bar: "Chat" | "Canvas" (active, `--accent2`)
+### Visualization Examples (12 frames)
 
+All use AI Brainstorm as sample data. Frame names: `01 — Mind Map` through `12 — Quote / Insight Card`.
 
-
-<!-- Agent IDs and icons: see CLAUDE.md Agent Catalog -->
+See `CLAUDE.md` → Agent Catalog for full list of 15 agent types and their JSON schemas.

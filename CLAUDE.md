@@ -207,6 +207,8 @@ All renderers use CSS variables for theming:
 
 Placeholder color: `#6a7086` (dedicated, no opacity reduction).
 
+Figma reference: see `design.md` for full frame map and Figma file link.
+
 ## Accessibility (WCAG 2.1 AA)
 
 The app follows WCAG 2.1 AA guidelines:
