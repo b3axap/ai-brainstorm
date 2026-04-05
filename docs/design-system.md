@@ -31,16 +31,14 @@
 | `--red` | `#ff6b6b` | Errors |
 | `--blue` | `#74b9ff` | Info |
 
-### Accent Alpha Overlays (CSS variables)
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--accent-a10` | `rgba(108,92,231,.1)` | Hover backgrounds, subtle tints |
-| `--accent-a15` | `rgba(108,92,231,.15)` | Selected states |
-| `--accent-a20` | `rgba(108,92,231,.2)` | Active/pressed states |
-| `--accent-a25` | `rgba(108,92,231,.25)` | Strong hover |
-| `--accent-a30` | `rgba(108,92,231,.3)` | Focus rings |
-| `--green-a10` | `rgba(0,206,201,.12)` | Green tinted backgrounds |
-| `--green-a25` | `rgba(0,184,148,.25)` | Green hover |
+### Alpha Overlays (CSS variables)
+
+Accent: `--accent-a05` / `a06` / `a10` / `a15` / `a20` / `a25` / `a30` / `a40`
+Green: `--green-a08` / `a10` / `a15` / `a25` / `a30`
+Cyan: `--cyan-a15` / `a20` / `a25`
+Other: `--red-a08`, `--tag-green` / `--tag-orange` / `--tag-pink` / `--tag-blue`
+Overlays: `--overlay-dark`, `--overlay-bg`, `--overlay-bg-heavy`
+Misc: `--spinner-track`, `--border-a50`
 
 ## Typography
 
@@ -81,21 +79,16 @@ Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 | `--radius-xl` | 12px | Modals, message bubbles |
 | `--radius-2xl` | 16px | Landing card, pills |
 
-## Shadows
+## Shadows & Transitions
 
 | Token | Value | Usage |
 |-------|-------|-------|
 | `--shadow` | `0 4px 24px rgba(0,0,0,.4)` | Cards, modals |
 | `--shadow-lg` | `0 8px 32px rgba(0,0,0,.5)` | Hover elevation |
 | `--shadow-xl` | `0 24px 80px rgba(0,0,0,.6)` | Expand popup |
-
-## Easing & Transitions
-
-| Token | Value | Usage |
-|-------|-------|-------|
 | `--ease-out` | `ease-out` | Entry animations |
 | `--ease-in-out` | `ease-in-out` | Pulsing, typing |
-| `--duration-fast` | `0.1s` | Micro interactions |
+| `--duration-fast` | `0.1s` | Micro (dropdown bg) |
 | `--duration-normal` | `0.15s` | Buttons, inputs |
 | `--duration-smooth` | `0.2s` | Cards, modals |
 | `--duration-slow` | `0.3s` | Toast, mobile panel |
@@ -104,7 +97,7 @@ Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 
 ### Buttons
 - **Default** `.btn`: `--surface2` bg, `--border` border, `--radius-md` (8px)
-- **Primary** `.btn-primary`: `--accent` bg, white text, hover `#7c6ef0`
+- **Primary** `.btn-primary`: `--accent` bg, white text, hover `--accent-hover`
 - **Suggest** `.suggest-btn`: `--accent-a10` bg, `--accent` border
 - **Disabled**: opacity 0.5, bg `--surface3`, border `--border`, color `--text2`, `cursor: not-allowed`
 
@@ -115,9 +108,7 @@ Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 
 ### Cards
 - `--surface` bg, `--border` border, 10px radius, shadow
-- Hover: purple border glow `rgba(108,92,231,.4)`
-
-### Visualization Components
+- Hover: border `--accent-a40`, shadow `--shadow-lg`
 
 ### Timeline
 - **Classes**: `.timeline-container`, `.tl-item`, `.tl-dot`, `.tl-line`, `.tl-date`, `.tl-desc`
@@ -220,7 +211,7 @@ Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 ### Interaction States
 | Frame | Description |
 |-------|-------------|
-| `00 — Chat Input: New Idea Mode` | ➕ active → green border `#00b894` + "New Idea" badge |
+| `00 — Chat Input: New Idea Mode` | ➕ active → green border `--green-dark` + "New Idea" badge |
 | `00 — Inline Editing States` | 5 states: mindmap label, table cell, checklist toggle, kanban drag, presentation bullet |
 | `00 — Empty Canvas State` | Grid + centered placeholder |
 | `00 — @ Mention Dropdown` | Type `@` → autocomplete artifact list |
@@ -242,14 +233,14 @@ Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 ### Chat Input Layout
 `[📎 Attach] [➕ New Idea] [text input] [Send]`
 - 📎 and ➕: 32×32 circle buttons, transparent bg, `--border` stroke, hover: `--accent`
-- New Idea active: green border `#00b894` + badge
+- New Idea active: green border `--green-dark` + badge
 - Delete artifact: 🗑 in action bar (hover red) + Delete key when card focused
 
 ---
 
 ## Animations & Transitions
 
-> **Not in Figma.** These specs live in `style.css` and JS modules. This section is the authoritative reference for all motion.
+> Sections below (Animations, Component States, Feedback, Keyboard, Mobile) are **not in Figma** — specs live in CSS/JS only.
 
 ### Keyframe Animations
 
@@ -260,106 +251,85 @@ Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 | `spin` | 0.6s / 1s | linear, infinite | rotate 0→360° | `.auto-spinner` (0.6s), `.gen-spinner` (1s) |
 | `typingPulse` | 1.5s | ease-in-out, infinite | opacity 1→0.5→1 | `.typing-indicator.visible` during Claude streaming |
 
-### Transition Tiers
+### Canvas Pan/Zoom
 
-| Tier | Duration | What uses it |
-|------|----------|-------------|
-| **Micro** | 0.1s | `.expand-transform-option`, `.transform-option`, `.mention-item` bg |
-| **Quick** | 0.15s | Buttons (`.btn`, `.suggest-btn`, `.art-action-btn`, `.expand-tool-btn`, `.canvas-zoom-btn`), inputs border, `.artifact-actions` opacity, `.bs-add-btn`/`.bs-delete-btn` reveal, `.viz-card`, `.viz-ref-chip` |
-| **Standard** | 0.2s | `.artifact-card` (box-shadow, border-color, opacity, transform), `.modal-overlay` opacity |
-| **Smooth** | 0.3s | `.toast` (transform + opacity), `.chat-panel` mobile toggle, `.checklist-bar-fill` width |
-
-### Canvas Pan/Zoom (no CSS transition)
-
-Canvas transform updates are **instantaneous** (direct `style.transform` assignment in JS) — no easing or transition. This is intentional for responsiveness.
-
-```
-.canvas-area { transform: translate(${panX}px, ${panY}px) scale(${scale}); }
-```
+Canvas transform is **instantaneous** (direct `style.transform` in JS, no transition) for 60fps responsiveness.
 
 ---
 
 ## Component States
 
-> **Not in Figma** (except partial: New Idea mode, inline editing, empty canvas). These tables document all visual states from CSS/JS.
-
 ### Artifact Card (`.artifact-card`)
 
 | State | Border | Shadow | Other |
 |-------|--------|--------|-------|
-| Default | `--border` | `0 4px 24px rgba(0,0,0,.4)` | `cursor: grab`, z-index: 1 |
-| Hover | `rgba(108,92,231,.4)` | `0 8px 32px rgba(0,0,0,.5)` | z-index: 10, action bar revealed (opacity 1) |
+| Default | `--border` | `--shadow` | `cursor: grab`, z-index: 1 |
+| Hover | `--accent-a40` | `--shadow-lg` | z-index: 10, action bar revealed |
 | Dragging | unchanged | unchanged | opacity: 0.9, `cursor: grabbing`, z-index: 100 |
-| Updating | unchanged | unchanged | `.artifact-updating` overlay with `.gen-spinner` |
+| Updating | unchanged | unchanged | `--overlay-bg-heavy` overlay + `.gen-spinner` |
 
-Action bar (`.artifact-actions`): `opacity: 0` → `1` on card hover, `pointer-events: none` → `auto`.
+Action bar (`.artifact-actions`): opacity 0 → 1 on card hover, pointer-events none → auto.
 
 ### Button Variants
 
 | Button | Default bg | Hover effect | Disabled |
 |--------|-----------|-------------|----------|
-| `.btn` | `--surface2` | bg `--surface3`, border `--accent` | opacity 0.5, no pointer events |
-| `.btn-primary` | `--accent` | bg `#7c6ef0` | opacity 0.5 |
-| `.suggest-btn` | `rgba(108,92,231,.1)` | bg `.25`, `translateY(-1px)` | opacity 0.5, `cursor: not-allowed` |
-| `.canvas-action-btn` | `rgba(0,206,201,.12)` | bg `.25`, `translateY(-1px)` | — |
-| `.generate-all-btn` | `rgba(0,184,148,.15)` | bg `.3`, `translateY(-1px)` | opacity 0.5 |
-| `.art-action-btn` | `--surface` | bg `--surface2`, border `--accent`, color `--accent2` | — |
-| `.art-action-danger` | same | border `--red`, color `--red`, bg `rgba(255,107,107,.08)` | — |
-| `.expand-tool-btn` | `--surface` | bg `--surface2`, border `--accent`, color `--accent2` | — |
-| `.clarify-option-btn` | `--surface2` | border `--accent`, color `--accent2`, bg `rgba(108,92,231,.1)` | — |
-| `.chat-action-btn` | transparent | border `--accent`, color `--accent2`, bg `rgba(108,92,231,.1)` | — |
+| `.btn` | `--surface2` | bg `--surface3`, border `--accent` | bg `--surface3`, `--text2`, not-allowed |
+| `.btn-primary` | `--accent` | bg `--accent-hover` | opacity 0.5 |
+| `.suggest-btn` | `--accent-a10` | bg `--accent-a25`, translateY(-1px) | bg `--surface3`, not-allowed |
+| `.canvas-action-btn` | `--green-a10` | bg `--cyan-a25`, translateY(-1px) | — |
+| `.generate-all-btn` | `--green-a15` | bg `--green-a30`, translateY(-1px) | bg `--surface3`, not-allowed |
+| `.art-action-btn` | `--surface` | bg `--surface2`, border+color `--accent2` | — |
+| `.art-action-danger` | same | border+color `--red`, bg `--red-a08` | — |
+| `.clarify-option-btn` | `--surface2` | border+color `--accent2`, bg `--accent-a10` | — |
 
-Selected states: `.clarify-option-btn.selected`, `.viz-card.selected`, `.viz-ref-chip.selected` all use `--accent` border + bg `rgba(108,92,231,.15/.2)`.
+Selected: `.clarify-option-btn.selected`, `.viz-card.selected`, `.viz-ref-chip.selected` — border `--accent` + bg `--accent-a15`/`a20`.
 
 ### Input (`.input`)
 
-| State | Border | Shadow | Other |
-|-------|--------|--------|-------|
-| Default | `--border` | none | — |
-| Focus | `--accent` | none | — |
-| Focus-visible | `--accent` | `0 0 0 2px rgba(108,92,231,.3)` | outline: `2px solid --accent2`, offset 2px |
-| New Idea mode | `#00b894` | `0 0 0 1px rgba(0,184,148,.3)` | "New Idea" badge visible |
+| State | Border | Shadow |
+|-------|--------|--------|
+| Default | `--border` | none |
+| Focus | `--accent` | none |
+| Focus-visible | `--accent` | `--accent-a30` ring |
+| New Idea mode | `--green-dark` | `--green-a30` ring |
 
 ### Inline Edit (`[data-edit]`)
 
 | State | Visual |
 |-------|--------|
-| Default | `cursor: text`, title "Double-click to edit" |
-| Hover | bg `rgba(108,92,231,.08)`, border-radius 3px |
-| Editing | `.bs-editing` — outline `2px solid --accent`, outline-offset -1px |
+| Hover | bg `--accent-a10`, radius 3px |
+| Editing | `.bs-editing` — outline `2px solid --accent` |
 
 ### Interactive Add/Delete Buttons
 
-| Element | Default | Parent hover | Self hover |
-|---------|---------|-------------|-----------|
-| `.bs-add-btn` | opacity 0 | opacity 0.7 | opacity 1, `scale(1.15)`, bg `--accent`, color white |
-| `.bs-delete-btn` | opacity 0 | opacity 0.5 | opacity 1, bg `--red`, color white |
-| `.bs-add-zone` | opacity 0.5, border transparent | — | opacity 1, border `--accent`, color `--accent`, bg `rgba(108,92,231,.06)` |
+| Element | Parent hover | Self hover |
+|---------|-------------|-----------|
+| `.bs-add-btn` | opacity 0.7 | opacity 1, scale(1.15), bg `--accent` |
+| `.bs-delete-btn` | opacity 0.5 | opacity 1, bg `--red` |
+| `.bs-add-zone` | — | border+color `--accent`, bg `--accent-a06` |
 
 ### Drag-and-Drop
 
-| Class | Applied when | Visual |
-|-------|-------------|--------|
-| `.dragging` | Artifact card being moved | opacity 0.9, `cursor: grabbing`, z-index 100 |
-| `.bs-dragging` | Data-attribute drag item | opacity 0.5 |
-| `.bs-drag-over` | Drop target hovered | bg `rgba(108,92,231,.1)`, outline `2px dashed --accent`, offset -2px, radius 6px |
-| `.kanban-card.dragging` | Kanban card drag | opacity 0.6 |
-| `.kanban-col.drag-over` | Kanban column target | bg `rgba(108,92,231,.05)`, radius 6px |
+| Class | Visual |
+|-------|--------|
+| `.bs-dragging` | opacity 0.5 |
+| `.bs-drag-over` | bg `--accent-a10`, outline `2px dashed --accent` |
+| `.kanban-card.dragging` | opacity 0.6 |
+| `.kanban-col.drag-over` | bg `--accent-a05` |
 
 ### Modals
 
-| Modal | Entry animation | Backdrop | Close triggers |
-|-------|----------------|---------|---------------|
-| Expand popup | `expandEnter` 0.2s ease-out | `rgba(0,0,0,.6)` | Escape, click outside, ✕ button |
-| Viz picker | `.modal-overlay` opacity 0→1, 0.2s | same | Escape, Cancel button, click outside |
-| Transform dropdown | instant (`display: block`) | none | Click outside, Escape |
-| Mention dropdown | instant (`display: block`) | none | Escape, click outside, blur |
+| Modal | Animation | Backdrop | Close |
+|-------|-----------|---------|-------|
+| Expand popup | `expandEnter` 0.2s | `--overlay-dark` | Escape, click outside, x |
+| Viz picker | opacity 0.2s | `--overlay-dark` | Escape, Cancel, click outside |
+| Transform dropdown | instant | none | Click outside, Escape |
+| Mention dropdown | instant | none | Escape, click outside, blur |
 
 ---
 
 ## Feedback States
-
-> **Not in Figma.** All loading, error, and connection states documented here.
 
 ### Toast Notifications
 
@@ -393,8 +363,6 @@ Selected states: `.clarify-option-btn.selected`, `.viz-card.selected`, `.viz-ref
 ---
 
 ## Keyboard Navigation
-
-> **Not in Figma.** No Figma prototype covers keyboard flows.
 
 ### Global
 
@@ -434,8 +402,6 @@ Selected states: `.clarify-option-btn.selected`, `.viz-card.selected`, `.viz-ref
 ---
 
 ## Mobile Behavior
-
-> **Partially in Figma** (2 frames: Chat View, Canvas View). Breakpoints and transitions not shown.
 
 ### Breakpoints
 
