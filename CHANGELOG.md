@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.1.0] — 2026-04-06
+
+### Added
+- **Custom Visualization agent** (`freeform`) — any HTML/CSS/JS, 12K token limit, state+render architecture
+- **Per-agent `maxTokens`** override in agent JSON schema
+- **Testing infrastructure** — 110 unit + integration tests (`node:test` + `node:assert`)
+- **Session export/import** — download/upload room as JSON, import into new or existing room
+- **12 visualization component docs** in `design-system.md` (Timeline, Donut, Kanban, Matrix, SWOT, Pros/Cons, Checklist, Quote Card, Presentation, File Chips, Mentions, Tags)
+
+### Changed
+- **Chat behavior tuning** — first message: clarifying questions; ongoing: always suggest viz
+- **Question UX redesign** — self-contained answers with toggle options, auto-resizing `<textarea>`, send gating
+- **Viz picker redesign** — textarea-first with example chips, template agents below
+- **Design system docs** — removed raw hex/rgba duplication, all values via tokens
+- **Standardized metadata** — `package.json` fields, agent `_schema.json`, `.env.example`, `README.md`
+
+### Fixed
+- **XSS vulnerabilities** — DOMPurify sanitization for all user content, MIME type escaping
+- **UI instability** — InteractiveEngine lifecycle, streaming race conditions, socket init order
+- **Legacy room safety** — guard for rooms without `memory` field
+
+### Security
+- Added DOMPurify CDN for HTML sanitization
+- Escaped file MIME types in attachment display
+
+---
+
 ## [1.0.0] — 2026-04-05
 
 ### Changed
