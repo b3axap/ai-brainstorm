@@ -241,9 +241,8 @@ Rules:
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1500,
       system: systemPrompt,
-      messages: messages,
-      signal: abortController.signal
-    });
+      messages: messages
+    }, { signal: abortController.signal });
 
     stream.on('text', (text) => {
       if (abortController.signal.aborted) return;

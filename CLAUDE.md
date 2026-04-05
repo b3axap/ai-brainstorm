@@ -108,11 +108,12 @@ npm install && npm start  # http://localhost:5000
 
 1. **JSON parsing uses `extractLastJsonBlock()`** — brace-depth counter, NOT regex. Nested objects break regex.
 2. **API responses: use `extractResponseText(response)`** — never access `response.content[0].text` directly.
-3. **Interactive CSS classes start with `.bs-`** — check `style.css` before claiming they're missing.
-4. **Interactivity is data-attribute driven** — do NOT add per-renderer handler code. See [`docs/interactivity.md`](docs/interactivity.md).
-5. **Room code validation** — server emits `join-error` if code not found, does NOT create new room.
-6. **Port is 5000** — `.replit`, `server.js`, `.claude/launch.json` all use 5000.
-7. **GitHub is source of truth** — don't modify docs/agents on Replit without syncing back.
+3. **Anthropic SDK `signal`** goes in the **second** argument (options), NOT in the request body: `.stream({model, ...}, { signal })`. Putting it in body causes `Extra inputs are not permitted`.
+4. **Interactive CSS classes start with `.bs-`** — check `style.css` before claiming they're missing.
+5. **Interactivity is data-attribute driven** — do NOT add per-renderer handler code. See [`docs/interactivity.md`](docs/interactivity.md).
+6. **Room code validation** — server emits `join-error` if code not found, does NOT create new room.
+7. **Port is 5000** — `.replit`, `server.js`, `.claude/launch.json` all use 5000.
+8. **GitHub is source of truth** — don't modify docs/agents on Replit without syncing back.
 
 ## Helper Functions (server.js)
 
