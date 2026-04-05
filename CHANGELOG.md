@@ -1,65 +1,104 @@
 # Changelog
 
-## v1.0.0 — Modular Architecture (2026-04-05)
-
-Major refactor: monolithic codebase decomposed into clean modules.
-
-**Server:** `server.js` (864 lines) → 12 modules in `server/`
-- `server/index.js` — Express entry point
-- `server/socket.js` — thin event router
-- `server/handlers/` — room, chat, artifact handlers
-- `server/claude/` — client, chat-analysis, artifact-ops, generation
-- `server/data/memory.js` — persistence-ready store interface
-- `config.js` — all hardcoded values centralized
-
-**Client:** `app.js` (1,437 lines) → 8 ES modules in `public/modules/`
-- state, utils, landing, chat, canvas, viz-picker, mentions, socket-handlers
-- Native ES modules (`import`/`export`), not `window.App` globals
-
-**Docs:** 5 files in `docs/`
-- architecture.md, agents.md, interactivity.md, design-system.md, socket-api.md
-
-**Cleanup:** Removed `server.js`, `design.md`, `prototype.html`, `app.legacy.js`, `versions/`
-
-**Fixes:** `renderArtifact` window export, port 5000 consistency, stale references
-
-**Branches:** `deploy` (default), `development`, `archive`
+All notable changes to this project are documented here.
+Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## v0.6.0 — Full Interactivity (2026-04-05)
+## [1.0.0] — 2026-04-05
 
-- Mindmap SVG drag, diagram code editor, expand popup for all types
-- InteractiveEngine: universal data-attribute protocol
-- Artifact actions: expand, transform, ask, copy, PNG, delete
-- AbortController signal fix for Anthropic SDK
+### Changed
+- **Server:** Decomposed `server.js` (864 lines) into 12 modules in `server/`
+- **Client:** Decomposed `app.js` (1,437 lines) into 8 ES modules in `public/modules/`
+- **Config:** All hardcoded values centralized in `config.js`
+- **Entry point:** `server.js` → `server/index.js`
+- **Port:** Standardized to 5000 everywhere
+- **Branches:** `deploy` (default), `development`, `archive` — removed `master`
 
-## v0.5.x — Documentation & Polish (2026-04-05)
+### Added
+- `docs/architecture.md` — module structure, data flow, dependency rules
+- `docs/agents.md` — step-by-step guide for new agents
+- `CHANGELOG.md` — consolidated release history
+- `window.renderArtifact` export for ES module compatibility
 
-- Split CLAUDE.md into layered docs (interactivity, design-system, socket-api)
-- Bug fixes for drag, inline editing, streaming
+### Removed
+- `server.js` — replaced by `server/index.js`
+- `design.md` — stub, content moved to `docs/design-system.md`
+- `prototype.html` — unused early prototype
+- `versions/` — 12 files, replaced by this changelog
+- `window.InteractiveLayer` — dead alias
 
-## v0.4.0 — Chat-First Architecture (2026-04-05)
+### Fixed
+- `renderArtifact` not exported to window (artifacts would render blank)
+- Port 3000/5000 inconsistency across `.env.example`, `.replit`, `config.js`
+- Stale references to deleted files in `CLAUDE.md`
 
-- Adaptive Claude behavior (no rigid phases)
-- Per-user chat history, structured JSON responses
-- Questions with clickable options, canvas actions
+---
 
-## v0.3.0 — Design Sync (2026-04-04)
+## [0.6.0] — 2026-04-05
 
-- Figma-matched dark theme, CSS variables
-- Mobile responsive layout, bottom tab bar
-- Resize handle for chat/canvas split
+### Added
+- Mindmap SVG node dragging with real-time line updates
+- Diagram Mermaid code editor (textarea overlay, Ctrl+S save)
+- Expand popup for all artifact types (90vw×85vh modal)
+- Artifact actions: AI Expand, Transform, Ask, Copy JSON, PNG export, Delete
+- Delete key shortcut on focused artifact cards
 
-## v0.2.0 — Split-View Workspace (2026-04-04)
+### Fixed
+- `AbortController.signal` placement in Anthropic SDK (2nd arg, not body)
 
-- Chat left + canvas right layout
-- File attachments (images + text)
-- @ mention autocomplete
-- Visualization picker modal
+---
 
-## v0.1.0 — Initial Prototype (2026-04-04)
+## [0.5.0] — 2026-04-05
 
-- Basic chat with Claude
+### Changed
+- Split monolithic `CLAUDE.md` into layered docs (`interactivity.md`, `design-system.md`, `socket-api.md`)
+
+### Fixed
+- Drag-and-drop edge cases
+- Inline editing state sync
+- Streaming message cleanup
+
+---
+
+## [0.4.0] — 2026-04-05
+
+### Changed
+- Chat-first architecture: adaptive Claude behavior, no rigid question phases
+- Per-user chat history (private context per socket)
+
+### Added
+- Structured JSON responses: `questions`, `suggest`, `offer_canvas`, `canvas_action`
+- Clickable question options with "Другое..." fallback
+- Canvas actions from Claude (create, update, transform)
+
+---
+
+## [0.3.0] — 2026-04-04
+
+### Added
+- Figma-matched dark theme with CSS variables
+- Mobile responsive layout (375×812) with bottom tab bar
+- Chat/canvas resize handle
+- Visualization picker modal with reference artifacts
+
+---
+
+## [0.2.0] — 2026-04-04
+
+### Added
+- Split-view workspace: chat left + canvas right
+- File attachments (images + text, max 5 files, 10MB each)
+- @ mention autocomplete for artifacts in chat
+- Room code sharing and join flow
+- 15 visualization agent types
+
+---
+
+## [0.1.0] — 2026-04-04
+
+### Added
+- Basic chat with Claude API
 - Mind map generation
-- Canvas with artifact cards
+- Canvas with draggable artifact cards
+- Room creation with 6-character codes
