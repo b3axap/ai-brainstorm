@@ -97,20 +97,41 @@ Shadow: `0 4px 24px rgba(0, 0, 0, 0.4)`
 
 ## Figma Frames
 
+> Source of truth for all UI. Replit must match these specs — do not invent new patterns.
+
+### App Screens
+| Frame | Size | Description |
+|-------|------|-------------|
+| `1. Landing Page` | 1440×900 | Centered card: name input, Create Room, join with code |
+| `00 — Workspace (Split-View)` | 1440×900 | Chat left (350px) + resize handle + canvas right. Header: room code `<button>` + user list. No header action buttons. |
+| `00 — Viz Picker Modal` | 1440×900 | Overlay + modal: 4×4 agent grid with checkboxes, pre-selected suggestions, custom viz input, Cancel / Generate (N) |
+| `00 — Mobile: Chat View` | 375×812 | Full-width chat, bottom tab bar (💬 Chat / 🎨 Canvas) |
+| `00 — Mobile: Canvas View` | 375×812 | Artifact cards on grid, bottom tab bar |
+
+### Interaction States
 | Frame | Description |
 |-------|-------------|
-| `00 — Landing Screen` | Centered card: name input, Create Room, join code |
-| `00 — Workspace (Split-View)` | 1440x900: chat left + canvas right |
-| `00 — Viz Picker Modal` | 4x4 agent grid, checkboxes, Generate (N) |
-| `00 — Mobile: Chat View` | 375x812: chat + bottom tab bar |
-| `00 — Mobile: Canvas View` | 375x812: artifacts + bottom tab bar |
-| `00 — Chat Input: New Idea Mode` | Green border + badge |
-| `00 — Inline Editing States` | 5 states: mindmap, table, checklist, kanban, presentation |
-| `00 — Empty Canvas State` | Grid + placeholder |
-| `00 — @ Mention Dropdown` | Autocomplete filtering |
-| `01-12` | All 12 structured visualization types |
+| `00 — Chat Input: New Idea Mode` | ➕ active → green border `#00b894` + "New Idea" badge |
+| `00 — Inline Editing States` | 5 states: mindmap label, table cell, checklist toggle, kanban drag, presentation bullet |
+| `00 — Empty Canvas State` | Grid + centered placeholder |
+| `00 — @ Mention Dropdown` | Type `@` → autocomplete artifact list |
+
+### Expand Popups (1060×700 modal)
+| Frame | Description |
+|-------|-------------|
+| `00 — Popup: Mind Map (Expanded)` | Full map + "+ Add branch/child", toolbar (Transform, Ask Claude, Copy JSON, ✕), ask bar |
+| `00 — Popup: Table (Expanded)` | Full table + "+ Add row", toolbar, ask bar |
+| `00 — Popup: Kanban (Expanded)` | 4-column board with card details + "+ Add card" per column |
+
+### Reference
+| Frame | Description |
+|-------|-------------|
+| `Design System` | Color palette, typography, spacing, border radius, buttons, inputs, cards, tags, agent icons |
+| `5. Artifact Cards` | All card types rendered side-by-side on canvas |
+| `01–12` | 12 individual visualization examples (sample data = AI Brainstorm itself) |
 
 ### Chat Input Layout
 `[📎 Attach] [➕ New Idea] [text input] [Send]`
-- 📎 and ➕: 32x32 circle buttons (transparent, `--border` stroke)
+- 📎 and ➕: 32×32 circle buttons, transparent bg, `--border` stroke, hover: `--accent`
 - New Idea active: green border `#00b894` + badge
+- Delete artifact: 🗑 in action bar (hover red) + Delete key when card focused
