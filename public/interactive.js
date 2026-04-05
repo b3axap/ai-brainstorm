@@ -543,6 +543,5 @@ class InteractiveEngine {
   }
 }
 
-// Backward compatibility alias
-window.InteractiveLayer = InteractiveEngine;
+// Expose to ES modules (loaded as global script before app.js module)
 window.InteractiveEngine = InteractiveEngine;

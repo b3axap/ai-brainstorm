@@ -658,3 +658,6 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+// Expose to ES modules (loaded as global script before app.js module)
+window.renderArtifact = renderArtifact;

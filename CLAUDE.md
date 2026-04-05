@@ -168,9 +168,9 @@ npm install && npm start  # http://localhost:5000
 
 **If diverged:** `git pull origin deploy` → `npm install` → restart.
 
-**Branches:** `archive` = v0.6 snapshot, `deploy` = production, `development` = active work, `master` = legacy.
+**Branches:** `deploy` = production (default), `development` = active work, `archive` = v0.6 snapshot.
 
-**Do NOT modify on Replit:** `CLAUDE.md`, `docs/*`, `design.md`, `agents/*.json`.
+**Do NOT modify on Replit:** `CLAUDE.md`, `docs/*`, `agents/*.json`.
 
 **Smoke test:** Create Room → send message → Claude responds with questions → answer → generate viz → appears on canvas.
 
