@@ -77,7 +77,9 @@ Output schemas: each agent's JSON file contains `outputExample`. Key schemas:
 
 **Artifact positioning:** 2-column grid via `calcArtifactPosition(index)`, 540px width + 40px gap.
 
-**Chat rendering:** Markdown via marked.js CDN. Auto-scroll to new artifacts.
+**Canvas pan/zoom:** Miro-like navigation via `_canvasPanZoom` (IIFE in `app.js`). Scroll = pan, Ctrl+Wheel = zoom (0.2x-2x), middle-click or Space+drag = pan. Zoom controls in bottom-right (#zoomControls). Canvas uses `transform: translate() scale()` on `.canvas-area` with `overflow: hidden` on `.canvas-panel`.
+
+**Chat rendering:** Markdown via marked.js CDN. Auto-scroll to new artifacts. Question options always include a "Другое..." button (dashed style, focuses chat input).
 
 **@ Mentions:** Type `@` → autocomplete dropdown → inserts `@Title` → server resolves to artifact data in Claude context.
 
@@ -114,6 +116,8 @@ npm install && npm start  # http://localhost:5000
 6. **Room code validation** — server emits `join-error` if code not found, does NOT create new room.
 7. **Port is 5000** — `.replit`, `server.js`, `.claude/launch.json` all use 5000.
 8. **GitHub is source of truth** — don't modify docs/agents on Replit without syncing back.
+9. **Canvas uses transform pan/zoom** — `.canvas-panel` has `overflow: hidden`, `.canvas-area` uses `transform: translate() scale()`. Do NOT use `scrollTo` — use `window._canvasPanZoom.panTo(x, y)`.
+10. **"Другое..." button is auto-added** — don't add it in Claude's prompt or options array, it's appended client-side in `app.js`.
 
 ## Helper Functions (server.js)
 
