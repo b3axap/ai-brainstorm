@@ -12,18 +12,43 @@ Collaborative brainstorming web app: users describe ideas in chat with Claude �
 
 **Core concept:** "Interpreter Agents" — JSON files in `agents/` define prompts for each visualization type. Adding an agent = JSON + renderer function + CSS.
 
-## File Structure
+## File Structure (v1.0.0 — Modular Monolith)
 
 ```
-server.js          — Express + Socket.IO + Claude API + data patching
-agents.js          — Auto-loads agent JSON files at startup
-agents/            — 15 agent JSON files + _schema.json
+config.js              — Centralized constants (model, grid, limits, ports)
+agents.js              — Auto-loads agent JSON files at startup
+agents/                — 15 agent JSON files + _schema.json
+server/
+  index.js             — Express + HTTP server setup, static serving
+  socket.js            — Socket.IO event router (thin dispatcher)
+  context.js           — buildContext (system prompt + message history)
+  utils.js             — Shared utilities (ID gen, JSON parser, path ops)
+  handlers/
+    room.js            — join-room, disconnect, room lifecycle
+    chat.js            — send-message, file validation, streaming trigger
+    artifact.js        — generate, move, delete, patch, array-op, actions
+  claude/
+    client.js          — Anthropic SDK wrapper, lazy init, concurrency
+    chat-analysis.js   — handleChatAnalysis (prompt building + streaming)
+    artifact-ops.js    — expand, transform, ask
+    generation.js      — handleArtifactGeneration with retry
+  data/
+    memory.js          — In-memory store (persistence-ready interface)
 public/
-  index.html       — SPA: landing + workspace (display:none switching)
-  app.js           — Client: state, Socket.IO, resize, mentions, viz picker
-  style.css        — Dark theme, split-view, artifact cards, .bs-* classes
-  renderers.js     — 15 renderers with data-attribute annotations + SDK
-  interactive.js   — InteractiveEngine: universal interactivity via data-attributes
+  index.html           — SPA: landing + workspace (display:none switching)
+  app.js               — ES module entry point (imports all modules)
+  style.css            — Dark theme, split-view, artifact cards, .bs-* classes
+  renderers.js         — 15 renderers with data-attribute annotations + SDK
+  interactive.js       — InteractiveEngine: universal interactivity via data-attributes
+  modules/
+    state.js           — Shared state + socket (single source of truth)
+    utils.js           — escHtml, renderMarkdown, showToast, showScreen
+    landing.js         — Landing screen logic
+    chat.js            — Chat UI, streaming, file attachment, new idea mode
+    canvas.js          — Artifact cards, actions, drag, expand popup, pan/zoom
+    viz-picker.js      — Visualization picker modal
+    mentions.js        — @ mention autocomplete
+    socket-handlers.js — All socket.on event handlers
 ```
 
 ## Detailed Documentation
@@ -114,26 +139,34 @@ npm install && npm start  # http://localhost:5000
 4. **Interactive CSS classes start with `.bs-`** — check `style.css` before claiming they're missing.
 5. **Interactivity is data-attribute driven** — do NOT add per-renderer handler code. See [`docs/interactivity.md`](docs/interactivity.md).
 6. **Room code validation** — server emits `join-error` if code not found, does NOT create new room.
-7. **Port is 5000** — `.replit`, `server.js`, `.claude/launch.json` all use 5000.
+7. **Port is 5000** on Replit (`.replit`), 3000 locally (`.env`). Check `config.js` for default.
 8. **GitHub is source of truth** — don't modify docs/agents on Replit without syncing back.
 9. **Canvas uses transform pan/zoom** — `.canvas-panel` has `overflow: hidden`, `.canvas-area` uses `transform: translate() scale()`. Do NOT use `scrollTo` — use `window._canvasPanZoom.panTo(x, y)`.
-10. **"Другое..." button is auto-added** — don't add it in Claude's prompt or options array, it's appended client-side in `app.js`.
+10. **"Другое..." button is auto-added** — don't add it in Claude's prompt or options array, it's appended client-side in `modules/socket-handlers.js`.
+11. **Entry point is `server/index.js`** — not `server.js` (legacy). `package.json` scripts point here.
+12. **Client uses ES modules** — `<script type="module" src="app.js">`. Use `import`/`export`, NOT `window.App` globals (that approach was reverted in commit d378843).
+13. **All config in `config.js`** — model name, grid layout, limits, ports. Don't hardcode these values in handlers.
 
-## Helper Functions (server.js)
+## Helper Functions
 
-| Function | Purpose |
-|----------|---------|
-| `extractLastJsonBlock(text)` | Find last `{...}` via brace-depth counting |
-| `extractResponseText(response)` | Safe `response.content[0].text` with null check |
-| `buildContext(room, socketId)` | System prompt + message history for Claude |
-| `generateId()` | Timestamp + random unique ID |
-| `generateRoomId()` | 6-char uppercase alphanumeric |
+| Function | Location | Purpose |
+|----------|----------|---------|
+| `extractLastJsonBlock(text)` | `server/utils.js` | Find last `{...}` via brace-depth counting |
+| `extractResponseText(response)` | `server/utils.js` | Safe `response.content[0].text` with null check |
+| `buildContext(room, socketId)` | `server/context.js` | System prompt + message history for Claude |
+| `generateId()` | `server/utils.js` | Timestamp + random unique ID |
+| `generateRoomId()` | `server/utils.js` | 6-char uppercase alphanumeric |
+| `applyPatch(data, path, value)` | `server/utils.js` | Path-based object patching |
+| `getByPath(obj, path)` | `server/utils.js` | Navigate to value at dot-separated path |
+| `getClient()` | `server/claude/client.js` | Lazy-init Anthropic SDK |
 
 ## Replit Deployment
 
-**Sync:** Local → GitHub (`b3axap/ai-brainstorm`, `master`) → Replit pulls.
+**Sync:** Local → GitHub (`b3axap/ai-brainstorm`, `deploy` branch) → Replit pulls.
 
-**If diverged:** `git pull origin master` → `npm install` → restart.
+**If diverged:** `git pull origin deploy` → `npm install` → restart.
+
+**Branches:** `archive` = v0.6 snapshot, `deploy` = production, `development` = active work, `master` = legacy.
 
 **Do NOT modify on Replit:** `CLAUDE.md`, `docs/*`, `design.md`, `agents/*.json`.
 

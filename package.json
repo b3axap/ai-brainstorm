@@ -1,6 +1,6 @@
 {
   "name": "ai-brainstorm",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Collaborative AI brainstorming with interpreter agents",
   "main": "server/index.js",
   "scripts": {
