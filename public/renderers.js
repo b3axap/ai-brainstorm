@@ -27,7 +27,7 @@ function renderArtifact(type, data, container) {
       renderer(data, container);
     } catch (err) {
       console.error(`[Renderer:${type}] Error:`, err);
-      container.innerHTML = `<div style="padding:20px;color:#f87171;">Render error in ${type}</div>`;
+      container.innerHTML = `<div style="padding:20px;color:var(--red);">Render error in ${type}</div>`;
     }
   } else {
     container.innerHTML = `<div style="padding:20px;color:var(--text2);">Unknown renderer: ${type}</div>`;
@@ -409,7 +409,7 @@ function renderSWOT(data, container) {
   let html = '<div class="swot-grid">';
   quads.forEach(q => {
     const items = data[q.key] || [];
-    html += `<div class="swot-quad" style="border-color:${q.color}20">
+    html += `<div class="swot-quad" style="--q-color:${q.color};border-color:color-mix(in srgb, ${q.color} 20%, transparent)">
       <div class="swot-header" style="color:${q.color}">${q.icon} ${q.label}</div>
       <ul class="swot-list">${items.map((it, j) =>
         `<li data-edit="${q.key}.${j}" data-delete="${q.key}.${j}"><span class="swot-bullet" style="background:${q.color}"></span>${escapeHtml(it)}</li>`
@@ -437,14 +437,14 @@ function renderKanban(data, container) {
     html += `<div class="kanban-col">
       <div class="kanban-col-header" data-edit="columns.${ci}.name" style="border-bottom-color:${color}">
         <span style="color:${color}">${escapeHtml(col.name)}</span>
-        <span class="kanban-count" style="background:${color}20;color:${color}">${(col.cards || []).length}</span>
+        <span class="kanban-count" style="background:color-mix(in srgb, ${color} 20%, transparent);color:${color}">${(col.cards || []).length}</span>
       </div>
       <div class="kanban-cards" data-drag-target="columns.${ci}.cards">`;
     (col.cards || []).forEach((card, cardi) => {
       const tc = tagColors[card.tag] || 'var(--text2)';
       html += `<div class="kanban-card" data-drag-item="columns.${ci}.cards.${cardi}" data-delete="columns.${ci}.cards.${cardi}">
         <div class="kanban-card-title" data-edit="columns.${ci}.cards.${cardi}.title">${escapeHtml(card.title)}</div>
-        ${card.tag ? `<span class="kanban-tag" style="background:${tc}20;color:${tc}">${escapeHtml(card.tag)}</span>` : ''}
+        ${card.tag ? `<span class="kanban-tag" style="background:color-mix(in srgb, ${tc} 20%, transparent);color:${tc}">${escapeHtml(card.tag)}</span>` : ''}
       </div>`;
     });
     html += `</div>
@@ -497,10 +497,10 @@ function renderMatrix(data, container) {
   html += '<div class="matrix-grid">';
 
   data.quadrants.forEach((q, i) => {
-    html += `<div class="matrix-quad ${positions[i]}" style="border-color:${colors[i]}30" data-drag-target="quadrants.${i}.items">
+    html += `<div class="matrix-quad ${positions[i]}" style="border-color:color-mix(in srgb, ${colors[i]} 30%, transparent)" data-drag-target="quadrants.${i}.items">
       <div class="matrix-quad-label" data-edit="quadrants.${i}.label" style="color:${colors[i]}">${escapeHtml(q.label)}</div>
       <div class="matrix-items">${(q.items || []).map((it, j) =>
-        `<span class="matrix-chip" data-edit="quadrants.${i}.items.${j}" data-delete="quadrants.${i}.items.${j}" data-drag-item="quadrants.${i}.items.${j}" style="background:${colors[i]}15;border-color:${colors[i]}40;color:${colors[i]}">${escapeHtml(it)}</span>`
+        `<span class="matrix-chip" data-edit="quadrants.${i}.items.${j}" data-delete="quadrants.${i}.items.${j}" data-drag-item="quadrants.${i}.items.${j}" style="background:color-mix(in srgb, ${colors[i]} 15%, transparent);border-color:color-mix(in srgb, ${colors[i]} 40%, transparent);color:${colors[i]}">${escapeHtml(it)}</span>`
       ).join('')}</div>
       <div data-add="quadrants.${i}.items" data-add-template='"New item"' class="bs-add-zone bs-add-zone-sm">+ Add</div>
     </div>`;
@@ -550,8 +550,8 @@ function renderDonutChart(data, container) {
   }
 
   const colorMap = {
-    purple: '#6c5ce7', blue: '#74b9ff', green: '#00cec9',
-    yellow: '#fdcb6e', red: '#ff6b6b', pink: '#fd79a8', orange: '#e17055'
+    purple: 'var(--accent)', blue: 'var(--blue)', green: 'var(--green)',
+    yellow: 'var(--orange)', red: 'var(--red)', pink: 'var(--pink)', orange: '#e17055'
   };
 
   const total = data.segments.reduce((sum, s) => sum + s.value, 0);
@@ -563,16 +563,16 @@ function renderDonutChart(data, container) {
   data.segments.forEach(seg => {
     const pct = seg.value / total;
     const dashLen = pct * circumference;
-    const color = colorMap[seg.color] || seg.color || '#6c5ce7';
+    const color = colorMap[seg.color] || seg.color || 'var(--accent)';
     arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
-      stroke="${color}" stroke-width="${strokeW}"
+      style="stroke:${color}" stroke-width="${strokeW}"
       stroke-dasharray="${dashLen} ${circumference - dashLen}"
       stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
     offset += dashLen;
   });
 
   let legend = data.segments.map((seg, i) => {
-    const color = colorMap[seg.color] || seg.color || '#6c5ce7';
+    const color = colorMap[seg.color] || seg.color || 'var(--accent)';
     const pct = Math.round((seg.value / total) * 100);
     return `<div class="donut-legend-item" data-delete="segments.${i}">
       <span class="donut-legend-dot" style="background:${color}"></span>

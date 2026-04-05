@@ -10,7 +10,8 @@ export function renderMarkdown(text) {
   if (!text) return '';
   if (typeof marked !== 'undefined' && marked.parse) {
     try {
-      return marked.parse(text, { breaks: true, gfm: true });
+      const html = marked.parse(text, { breaks: true, gfm: true });
+      return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : escHtml(text);
     } catch (e) {
       return escHtml(text);
     }

@@ -18,10 +18,11 @@ function handleSendMessage(socket, io, { roomId, content, isNewIdea, files }) {
   }
 
   // Validate and cap files
+  const MIME_RE = /^(image|text|application|audio|video)\/[\w.+-]+$/;
   let validFiles = null;
   if (files && Array.isArray(files) && files.length > 0) {
     validFiles = files.slice(0, config.maxFiles).filter(
-      f => f.data && f.type && f.data.length < config.maxFileSizeBase64
+      f => f.data && f.type && MIME_RE.test(f.type) && f.data.length < config.maxFileSizeBase64
     );
   }
 

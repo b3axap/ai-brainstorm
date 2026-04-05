@@ -98,7 +98,7 @@ export function addChatMessage(message) {
   if (message.files && message.files.length > 0) {
     const chips = message.files.map(f => {
       if (f.isImage) {
-        return `<div class="msg-file"><img class="msg-file-thumb" src="data:${f.type};base64,${f.data}" alt="${escHtml(f.name)}"></div>`;
+        return `<div class="msg-file"><img class="msg-file-thumb" src="data:${escHtml(f.type)};base64,${escHtml(f.data)}" alt="${escHtml(f.name)}"></div>`;
       }
       return `<div class="msg-file"><span class="msg-file-icon">📄</span><span class="msg-file-name">${escHtml(f.name)}</span></div>`;
     }).join('');
@@ -193,7 +193,7 @@ function renderFilePreview() {
     const chip = document.createElement('div');
     chip.className = 'file-chip';
     if (file.isImage) {
-      chip.innerHTML = `<img class="file-chip-thumb" src="data:${file.type};base64,${file.data}" alt="">`;
+      chip.innerHTML = `<img class="file-chip-thumb" src="data:${escHtml(file.type)};base64,${escHtml(file.data)}" alt="">`;
     } else {
       chip.innerHTML = `<span class="file-chip-icon">📄</span>`;
     }

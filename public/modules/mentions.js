@@ -48,10 +48,11 @@ export function initMentions() {
       const items = dropdown.querySelectorAll('.mention-item');
       if (items.length === 0) return;
       const current = dropdown.querySelector('.mention-item.active');
-      if (current) current.classList.remove('active');
+      if (current) { current.classList.remove('active'); current.setAttribute('aria-selected', 'false'); }
       let idx = Array.from(items).indexOf(current);
       idx = e.key === 'ArrowDown' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
       items[idx].classList.add('active');
+      items[idx].setAttribute('aria-selected', 'true');
       e.preventDefault();
     }
   });
@@ -62,6 +63,8 @@ function showMentionDropdown(matches, inputEl, dropdown) {
   matches.forEach((art, i) => {
     const item = document.createElement('div');
     item.className = `mention-item${i === 0 ? ' active' : ''}`;
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
     item.dataset.artifactId = art.id;
     item.innerHTML = `
       <span class="mention-icon">${art.icon || '📄'}</span>
