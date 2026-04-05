@@ -105,31 +105,40 @@ export function initSocketHandlers() {
             btn.className = 'clarify-option-btn';
             btn.textContent = opt;
             btn.onclick = () => {
-              const input = document.getElementById('chatInput');
-              const current = input.value.trim();
-              input.value = current ? current + '. ' + opt : opt;
-              input.focus();
-              btn.classList.add('selected');
+              btn.classList.toggle('selected');
+              if (typeof window._updateSendState === 'function') window._updateSendState();
             };
             optionsDiv.appendChild(btn);
           });
-          // "Другое..." button
-          const otherBtn = document.createElement('button');
-          otherBtn.className = 'clarify-option-btn clarify-other';
-          otherBtn.textContent = 'Другое...';
-          otherBtn.onclick = () => {
-            const input = document.getElementById('chatInput');
-            input.value = '';
-            input.focus();
-            input.placeholder = 'Напишите свой вариант...';
-          };
-          optionsDiv.appendChild(otherBtn);
           qBlock.appendChild(optionsDiv);
+          // Custom answer input below options
+          const customInput = document.createElement('input');
+          customInput.type = 'text';
+          customInput.className = 'clarify-custom-input';
+          customInput.placeholder = 'Свой вариант...';
+          customInput.addEventListener('input', () => {
+            if (typeof window._updateSendState === 'function') window._updateSendState();
+          });
+          qBlock.appendChild(customInput);
+        } else {
+          // Open question — inline input
+          const inlineInput = document.createElement('input');
+          inlineInput.type = 'text';
+          inlineInput.className = 'clarify-inline-input';
+          inlineInput.placeholder = 'Ваш ответ...';
+          inlineInput.addEventListener('input', () => {
+            if (typeof window._updateSendState === 'function') window._updateSendState();
+          });
+          qBlock.appendChild(inlineInput);
         }
         questionsDiv.appendChild(qBlock);
       });
       actionsDiv.appendChild(questionsDiv);
       hasContent = true;
+      // Update send button state after questions render
+      setTimeout(() => {
+        if (typeof window._updateSendState === 'function') window._updateSendState();
+      }, 0);
     }
 
     // Canvas offer

@@ -3,7 +3,7 @@
 
 import { socket, agentsReady } from './modules/state.js';
 import { initLanding } from './modules/landing.js';
-import { initChat } from './modules/chat.js';
+import { initChat, updateSendState } from './modules/chat.js';
 import { initCanvas } from './modules/canvas.js';
 import { initVizPicker } from './modules/viz-picker.js';
 import { initMentions } from './modules/mentions.js';
@@ -18,6 +18,7 @@ if (typeof mermaid !== 'undefined') {
 // Wire up all modules (register handlers before socket connects)
 initLanding();
 initChat();
+window._updateSendState = updateSendState;
 initCanvas();
 initVizPicker();
 initMentions();

@@ -55,7 +55,8 @@ IMPORTANT — QUESTION PLACEMENT:
 - Your text response should be your thoughts, observations, and ideas — the conversational part. Questions are separate.
 
 3. QUESTIONS FORMAT:
-   - First message: 1-4 questions. Subsequent messages: 0-1 questions.
+   - First message: 1-4 questions.
+   - Subsequent messages: max 3 questions, of which at most 1 can be open-ended (no options). The user can ask for more questions if needed.
    - Each question that has obvious answer variants (yes/no, a few clear options) MUST include them as clickable options
    - Format: {"q": "question text", "options": ["Option A", "Option B", "Option C"]}
    - If the question is open-ended with no obvious options, just include the question as a string: "What's your main concern?"

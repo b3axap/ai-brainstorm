@@ -7,11 +7,51 @@ import { closeMentionDropdown } from './mentions.js';
 let streamingMsgId = null;
 let streamingActive = false;
 
+export function updateSendState() {
+  const input = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('chatSendBtn');
+  const hasText = input.value.trim().length > 0;
+  const hasFiles = state.pendingFiles.length > 0;
+
+  // Check if last clarify section has any interaction
+  const allSections = document.querySelectorAll('.clarify-section');
+  let lastSectionAnswered = false;
+  if (allSections.length > 0) {
+    const lastSection = allSections[allSections.length - 1];
+    const blocks = lastSection.querySelectorAll('.clarify-block');
+    if (blocks.length > 0) {
+      const lastBlock = blocks[blocks.length - 1];
+      const hasSelected = lastBlock.querySelector('.clarify-option-btn.selected');
+      const inlineInput = lastBlock.querySelector('.clarify-inline-input');
+      const hasInlineText = inlineInput && inlineInput.value.trim().length > 0;
+      const customInput = lastBlock.querySelector('.clarify-custom-input');
+      const hasCustomText = customInput && customInput.value.trim().length > 0;
+      lastSectionAnswered = !!(hasSelected || hasInlineText || hasCustomText);
+    }
+  }
+
+  sendBtn.disabled = !(hasText || hasFiles || lastSectionAnswered);
+}
+
 export function initChat() {
-  document.getElementById('chatSendBtn').onclick = sendChatMessage;
-  document.getElementById('chatInput').onkeypress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) sendChatMessage();
+  const sendBtn = document.getElementById('chatSendBtn');
+  sendBtn.onclick = sendChatMessage;
+  sendBtn.disabled = true;
+
+  const chatInput = document.getElementById('chatInput');
+  chatInput.onkeydown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
   };
+
+  // Auto-resize textarea
+  chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+    updateSendState();
+  });
 
   // File attachment
   document.getElementById('attachBtn').onclick = () => {
@@ -60,12 +100,52 @@ export function initChat() {
   };
 }
 
+function collectClarifyAnswers() {
+  const sections = document.querySelectorAll('.clarify-section');
+  if (!sections.length) return '';
+  const answers = [];
+  sections.forEach(section => {
+    section.querySelectorAll('.clarify-block').forEach(block => {
+      const qEl = block.querySelector('.clarify-question');
+      const question = qEl ? qEl.textContent.replace(/^\?\s*/, '') : '';
+
+      // Collect selected options
+      const selected = Array.from(block.querySelectorAll('.clarify-option-btn.selected'))
+        .map(b => b.textContent).join(', ');
+
+      // Collect custom input
+      const customInput = block.querySelector('.clarify-custom-input');
+      const custom = customInput ? customInput.value.trim() : '';
+
+      // Collect inline input (open questions)
+      const inlineInput = block.querySelector('.clarify-inline-input');
+      const inline = inlineInput ? inlineInput.value.trim() : '';
+
+      const answer = [selected, custom, inline].filter(Boolean).join(', ');
+      if (answer) answers.push(`${question}: ${answer}`);
+    });
+  });
+  return answers.join('\n');
+}
+
+function clearClarifyUI() {
+  document.querySelectorAll('.clarify-section').forEach(s => {
+    s.querySelectorAll('.clarify-option-btn.selected').forEach(b => b.classList.remove('selected'));
+    s.querySelectorAll('.clarify-inline-input, .clarify-custom-input').forEach(i => { i.value = ''; });
+  });
+}
+
 function sendChatMessage() {
   const input = document.getElementById('chatInput');
-  const content = input.value.trim();
+  const userText = input.value.trim();
+  const clarifyText = collectClarifyAnswers();
+  const content = [clarifyText, userText].filter(Boolean).join('\n\n');
   const hasFiles = state.pendingFiles.length > 0;
   if ((!content && !hasFiles) || state.generating) return;
   input.value = '';
+  input.style.height = 'auto';
+  clearClarifyUI();
+  updateSendState();
   closeMentionDropdown();
 
   const isNewIdea = state.newIdeaMode || false;

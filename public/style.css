@@ -218,8 +218,12 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .actions-label { font-size: var(--text-sm); color: var(--text2); font-weight: 500; margin-top: var(--space-xs); }
 .push-to-canvas-btn { padding: 10px var(--space-2xl); border-radius: var(--radius-md); border: 1px solid var(--green-dark); background: var(--green-a10); color: var(--green-bright); font-size: var(--text-base); cursor: pointer; transition: all var(--duration-normal); font-weight: 500; align-self: flex-start; }
 .push-to-canvas-btn:hover { background: var(--green-a25); transform: translateY(-1px); }
-.chat-input { padding: var(--space-lg) var(--space-xl); background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; gap: var(--space-md); flex-shrink: 0; }
-.chat-input .input { flex: 1; }
+.chat-input { padding: var(--space-lg) var(--space-xl); background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: flex-end; gap: var(--space-md); flex-shrink: 0; }
+.chat-input .input { flex: 1; resize: none; overflow-y: auto; max-height: 120px; min-height: 36px; line-height: 1.4; }
+#chatSendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.clarify-inline-input, .clarify-custom-input { width: 100%; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: var(--text-md); transition: border-color var(--duration-normal); }
+.clarify-inline-input:focus, .clarify-custom-input:focus { border-color: var(--accent); outline: none; }
+.clarify-custom-input { margin-top: var(--space-xs); font-size: var(--text-sm); }
 .chat-action-btn { width: 32px; height: 32px; border-radius: var(--radius-full); border: 1px solid var(--border); background: transparent; color: var(--text2); font-size: var(--text-lg); cursor: pointer; transition: all var(--duration-normal); display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0; }
 .chat-action-btn:hover { border-color: var(--accent); color: var(--accent2); background: var(--accent-a10); }
 .chat-action-btn.active { border-color: var(--green-dark); color: var(--green-bright); background: var(--green-a10); }
