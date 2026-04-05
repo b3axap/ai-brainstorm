@@ -2,10 +2,10 @@
   "name": "ai-brainstorm",
   "version": "0.3.0",
   "description": "Collaborative AI brainstorming with interpreter agents",
-  "main": "server.js",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

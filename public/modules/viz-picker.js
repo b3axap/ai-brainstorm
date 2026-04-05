@@ -1,8 +1,8 @@
-// viz-picker.js — Visualization picker modal
+// Visualization picker modal
+import { state, socket } from './state.js';
+import { escHtml, showToast } from './utils.js';
 
-(function() {
-  const { socket, state, escHtml, showToast } = App;
-
+export function initVizPicker() {
   document.getElementById('vizCancelBtn').onclick = closeVizPicker;
   document.getElementById('vizPickerModal').onclick = (e) => {
     if (e.target.id === 'vizPickerModal') closeVizPicker();
@@ -42,74 +42,77 @@
   };
 
   document.getElementById('vizCustomInput').oninput = updateVizGenerateBtn;
+}
 
-  App.openVizPicker = function(preSelected) {
-    state.pendingSuggestions = preSelected || [];
-    populateVizGrid();
-    populateVizRefs();
-    document.getElementById('vizCustomCheck').checked = false;
-    document.getElementById('vizCustomInput').value = '';
-    document.getElementById('vizCustomInput').disabled = true;
-    document.getElementById('vizPickerModal').classList.add('active');
-    updateVizGenerateBtn();
-  };
+export function openVizPicker(preSelected) {
+  state.pendingSuggestions = preSelected || [];
+  populateVizGrid();
+  populateVizRefs();
+  document.getElementById('vizCustomCheck').checked = false;
+  document.getElementById('vizCustomInput').value = '';
+  document.getElementById('vizCustomInput').disabled = true;
+  document.getElementById('vizPickerModal').classList.add('active');
+  updateVizGenerateBtn();
+}
 
-  function closeVizPicker() {
-    document.getElementById('vizPickerModal').classList.remove('active');
+function closeVizPicker() {
+  document.getElementById('vizPickerModal').classList.remove('active');
+}
+
+function populateVizGrid() {
+  const grid = document.getElementById('vizGrid');
+  grid.innerHTML = '';
+  state.agents.forEach(agent => {
+    const isPreSelected = state.pendingSuggestions.includes(agent.id);
+    const card = document.createElement('label');
+    card.className = `viz-card${isPreSelected ? ' selected' : ''}`;
+    card.innerHTML = `
+      <input type="checkbox" class="viz-checkbox" data-agent-id="${agent.id}" ${isPreSelected ? 'checked' : ''}>
+      <span class="viz-icon">${agent.icon}</span>
+      <span class="viz-name">${escHtml(agent.name)}</span>
+      ${isPreSelected ? '<span class="viz-recommended">recommended</span>' : ''}
+    `;
+    card.querySelector('.viz-checkbox').onchange = function() {
+      card.classList.toggle('selected', this.checked);
+      updateVizGenerateBtn();
+    };
+    grid.appendChild(card);
+  });
+}
+
+function populateVizRefs() {
+  const refsContainer = document.getElementById('vizReferences');
+  const grid = document.getElementById('vizRefGrid');
+  if (state.artifacts.length === 0) {
+    refsContainer.style.display = 'none';
+    return;
   }
+  refsContainer.style.display = '';
+  grid.innerHTML = '';
+  state.artifacts.forEach(art => {
+    const chip = document.createElement('div');
+    chip.className = 'viz-ref-chip';
+    chip.dataset.artifactId = art.id;
+    chip.innerHTML = `<span class="ref-icon">${art.icon || '📄'}</span> ${escHtml(art.title || 'Untitled')}`;
+    chip.onclick = () => chip.classList.toggle('selected');
+    grid.appendChild(chip);
+  });
+}
 
-  function populateVizGrid() {
-    const grid = document.getElementById('vizGrid');
-    grid.innerHTML = '';
-    state.agents.forEach(agent => {
-      const isPreSelected = state.pendingSuggestions.includes(agent.id);
-      const card = document.createElement('label');
-      card.className = `viz-card${isPreSelected ? ' selected' : ''}`;
-      card.innerHTML = `
-        <input type="checkbox" class="viz-checkbox" data-agent-id="${agent.id}" ${isPreSelected ? 'checked' : ''}>
-        <span class="viz-icon">${agent.icon}</span>
-        <span class="viz-name">${escHtml(agent.name)}</span>
-        ${isPreSelected ? '<span class="viz-recommended">recommended</span>' : ''}
-      `;
-      card.querySelector('.viz-checkbox').onchange = function() {
-        card.classList.toggle('selected', this.checked);
-        updateVizGenerateBtn();
-      };
-      grid.appendChild(card);
-    });
-  }
+function getSelectedVizTypes() {
+  return Array.from(document.querySelectorAll('.viz-checkbox:checked')).map(cb => cb.dataset.agentId);
+}
 
-  function populateVizRefs() {
-    const refsContainer = document.getElementById('vizReferences');
-    const grid = document.getElementById('vizRefGrid');
-    if (state.artifacts.length === 0) { refsContainer.style.display = 'none'; return; }
-    refsContainer.style.display = '';
-    grid.innerHTML = '';
-    state.artifacts.forEach(art => {
-      const chip = document.createElement('div');
-      chip.className = 'viz-ref-chip';
-      chip.dataset.artifactId = art.id;
-      chip.innerHTML = `<span class="ref-icon">${art.icon || '📄'}</span> ${escHtml(art.title || 'Untitled')}`;
-      chip.onclick = () => chip.classList.toggle('selected');
-      grid.appendChild(chip);
-    });
-  }
+function getSelectedRefIds() {
+  return Array.from(document.querySelectorAll('.viz-ref-chip.selected')).map(el => el.dataset.artifactId);
+}
 
-  function getSelectedVizTypes() {
-    return Array.from(document.querySelectorAll('.viz-checkbox:checked')).map(cb => cb.dataset.agentId);
-  }
-
-  function getSelectedRefIds() {
-    return Array.from(document.querySelectorAll('.viz-ref-chip.selected')).map(el => el.dataset.artifactId);
-  }
-
-  function updateVizGenerateBtn() {
-    const selected = getSelectedVizTypes();
-    const hasCustom = document.getElementById('vizCustomCheck').checked
-      && document.getElementById('vizCustomInput').value.trim();
-    const count = selected.length + (hasCustom ? 1 : 0);
-    const btn = document.getElementById('vizGenerateBtn');
-    btn.disabled = count === 0;
-    btn.textContent = count > 0 ? `Generate Selected (${count})` : 'Generate Selected (0)';
-  }
-})();
+function updateVizGenerateBtn() {
+  const selected = getSelectedVizTypes();
+  const hasCustom = document.getElementById('vizCustomCheck').checked
+    && document.getElementById('vizCustomInput').value.trim();
+  const count = selected.length + (hasCustom ? 1 : 0);
+  const btn = document.getElementById('vizGenerateBtn');
+  btn.disabled = count === 0;
+  btn.textContent = count > 0 ? `Generate Selected (${count})` : 'Generate Selected (0)';
+}
