@@ -1,4 +1,4 @@
-try { require('dotenv/config'); } catch(e) { /* dotenv optional, Replit uses Secrets */ }
+try { require('dotenv').config({ override: true }); } catch(e) { /* dotenv optional, Replit uses Secrets */ }
 
 const express = require('express');
 const http = require('http');

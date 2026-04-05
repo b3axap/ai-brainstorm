@@ -408,5 +408,6 @@ export function initSocketHandlers() {
     showToast('Error: ' + message);
     document.getElementById('typingIndicator').classList.remove('visible');
     document.querySelectorAll('.artifact-updating').forEach(el => el.remove());
+    document.querySelectorAll('.expand-loading').forEach(el => el.remove());
   });
 }

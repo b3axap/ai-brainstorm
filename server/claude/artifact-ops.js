@@ -11,16 +11,22 @@ function parseJsonFromResponse(text) {
   }
 }
 
+const FREEFORM_DATA_INSTRUCTIONS = `The current data is a JSON object with "title" (string) and "html" (complete HTML document string).
+You MUST return valid JSON: {"title": "...", "html": "<!DOCTYPE html><html>...</html>"}
+The "html" field must contain the COMPLETE, WORKING HTML document with all <style> and <script> inline. Do NOT omit or truncate any part.`;
+
 async function handleArtifactExpand(room, artifact, socket, io) {
   const agent = getAgent(artifact.type);
   if (!agent) return;
 
   const { systemBase } = buildContext(room, socket.id);
-  const system = `${systemBase}\n\n${agent.systemPrompt}\n\nYou are given an existing ${artifact.type} visualization. EXPAND it with significantly more detail, depth, and sub-items. Keep the same JSON structure but make it richer.\n\nExisting data:\n${JSON.stringify(artifact.data, null, 2)}\n\nReturn the COMPLETE updated JSON (not just the additions).`;
+  const isFreeform = artifact.type === 'freeform';
+  const dataInstructions = isFreeform ? FREEFORM_DATA_INSTRUCTIONS : 'Return the COMPLETE updated JSON (not just the additions).';
+  const system = `${systemBase}\n\n${agent.systemPrompt}\n\nYou are given an existing ${artifact.type} visualization. EXPAND it with significantly more detail, depth, and sub-items. Keep the same structure but make it richer.\n\n${dataInstructions}\n\nExisting data:\n${JSON.stringify(artifact.data, null, 2)}`;
 
   const response = await claude.getClient().messages.create({
     model: config.claude.model,
-    max_tokens: config.claude.generationMaxTokens,
+    max_tokens: agent.maxTokens || config.claude.generationMaxTokens,
     system,
     messages: [{ role: 'user', content: 'Expand this visualization with more detail.' }]
   });
@@ -46,7 +52,7 @@ async function handleArtifactTransform(room, artifact, targetType, socket, io) {
 
   const response = await claude.getClient().messages.create({
     model: config.claude.model,
-    max_tokens: config.claude.generationMaxTokens,
+    max_tokens: agent.maxTokens || config.claude.generationMaxTokens,
     system,
     messages: [{ role: 'user', content: `Convert this ${artifact.type} into a ${targetType}.` }]
   });
@@ -77,11 +83,13 @@ async function handleArtifactAsk(room, artifact, question, socket, io) {
   if (!agent) return;
 
   const { systemBase } = buildContext(room, socket.id);
-  const system = `${systemBase}\n\n${agent.systemPrompt}\n\nYou are modifying an existing ${artifact.type} visualization based on a user's request. Apply the requested changes and return the COMPLETE updated JSON.\n\nCurrent data:\n${JSON.stringify(artifact.data, null, 2)}`;
+  const isFreeform = artifact.type === 'freeform';
+  const dataInstructions = isFreeform ? FREEFORM_DATA_INSTRUCTIONS : 'Apply the requested changes and return the COMPLETE updated JSON.';
+  const system = `${systemBase}\n\n${agent.systemPrompt}\n\nYou are modifying an existing ${artifact.type} visualization based on a user's request.\n\n${dataInstructions}\n\nCurrent data:\n${JSON.stringify(artifact.data, null, 2)}`;
 
   const response = await claude.getClient().messages.create({
     model: config.claude.model,
-    max_tokens: config.claude.generationMaxTokens,
+    max_tokens: agent.maxTokens || config.claude.generationMaxTokens,
     system,
     messages: [{ role: 'user', content: question }]
   });
