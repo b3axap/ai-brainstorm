@@ -138,6 +138,7 @@ Rules:
 
         // Apply memory_update to room memory
         if (parsed.memory_update && typeof parsed.memory_update === 'object') {
+          if (!room.memory) room.memory = { topic: '', goals: [], keyDecisions: [], openQuestions: [], participants: {} };
           const mu = parsed.memory_update;
           if (mu.topic) room.memory.topic = mu.topic;
           if (Array.isArray(mu.goals)) room.memory.goals = mu.goals;
