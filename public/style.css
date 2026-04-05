@@ -61,8 +61,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .chat-panel { display: flex; flex-direction: column; overflow: hidden; min-width: 280px; background: var(--surface); border-right: none; }
 .resize-handle { background: var(--border); cursor: col-resize; transition: background .15s; z-index: 20; }
 .resize-handle:hover, .resize-handle.active { background: var(--accent); }
-.canvas-panel { position: relative; overflow: auto; background: var(--bg); }
-.canvas-area { position: relative; width: 4000px; height: 4000px; }
+.canvas-panel { position: relative; overflow: hidden; background: var(--bg); }
+.canvas-panel.panning { cursor: grabbing; }
+.canvas-area { position: relative; width: 4000px; height: 4000px; transform-origin: 0 0; }
 .canvas-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, #2a2f3d 1px, transparent 1px); background-size: 24px 24px; }
 .canvas-content { position: absolute; inset: 0; }
 .canvas-empty { position: sticky; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--text2); pointer-events: none; z-index: 2; }
@@ -167,6 +168,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 
 /* --- ARTIFACT CARDS --- */
 .artifact-card { position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 300px; max-width: 500px; cursor: grab; user-select: none; transition: box-shadow .2s, border-color .2s, opacity .2s, transform .2s; z-index: 1; animation: artifactEnter .25s ease-out; }
+.artifact-card::before { content: ''; position: absolute; top: -40px; left: 0; right: 0; height: 40px; }
 @keyframes artifactEnter { from { opacity: 0; transform: scale(.95) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .artifact-card:hover { border-color: rgba(108,92,231,.4); box-shadow: 0 8px 32px rgba(0,0,0,.5); z-index: 10; }
 .artifact-card.dragging { cursor: grabbing; opacity: .9; z-index: 100; }
@@ -518,3 +520,14 @@ textarea.bs-input { resize: vertical; min-height: 48px; line-height: 1.4; }
 .viz-ref-chip:hover { border-color: var(--accent); }
 .viz-ref-chip.selected { border-color: var(--accent); background: rgba(108,92,231,.15); color: var(--accent2); }
 .viz-ref-chip .ref-icon { font-size: 14px; }
+
+/* Canvas zoom controls */
+.canvas-zoom-controls { position: absolute; bottom: 16px; right: 16px; display: flex; gap: 4px; z-index: 30; }
+.canvas-zoom-btn { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.canvas-zoom-btn:hover { background: var(--surface2); border-color: var(--accent); color: var(--accent2); }
+.canvas-zoom-level { height: 32px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 11px; display: flex; align-items: center; cursor: pointer; transition: all .15s; }
+.canvas-zoom-level:hover { background: var(--surface2); border-color: var(--accent); color: var(--accent2); }
+
+/* "Другое" option in chat */
+.clarify-other { border-style: dashed; opacity: .7; }
+.clarify-other:hover { opacity: 1; }

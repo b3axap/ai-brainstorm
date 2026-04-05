@@ -902,6 +902,17 @@ socket.on('claude-done', ({ fullMessage, suggestedTypes, clarifyQuestions, offer
           };
           optionsDiv.appendChild(btn);
         });
+        // Always add "Другое..." option
+        const otherBtn = document.createElement('button');
+        otherBtn.className = 'clarify-option-btn clarify-other';
+        otherBtn.textContent = 'Другое...';
+        otherBtn.onclick = () => {
+          const input = document.getElementById('chatInput');
+          input.value = '';
+          input.focus();
+          input.placeholder = 'Напишите свой вариант...';
+        };
+        optionsDiv.appendChild(otherBtn);
         qBlock.appendChild(optionsDiv);
       }
       questionsDiv.appendChild(qBlock);
@@ -1004,13 +1015,15 @@ socket.on('artifact-created', ({ artifact }) => {
     if (tabCanvas) tabCanvas.click();
   }
 
-  // Smooth scroll canvas to the new artifact
+  // Pan canvas to the new artifact
   if (card) {
     setTimeout(() => {
-      const panel = document.getElementById('canvasPanel');
-      if (panel) {
-        const pos = artifact.position || { x: 0, y: 0 };
-        panel.scrollTo({ left: Math.max(0, pos.x - 40), top: Math.max(0, pos.y - 40), behavior: 'smooth' });
+      const pos = artifact.position || { x: 0, y: 0 };
+      if (window._canvasPanZoom) {
+        window._canvasPanZoom.panTo(pos.x - 40, pos.y - 40);
+      } else {
+        const panel = document.getElementById('canvasPanel');
+        if (panel) panel.scrollTo({ left: Math.max(0, pos.x - 40), top: Math.max(0, pos.y - 40), behavior: 'smooth' });
       }
     }, 100);
   }
@@ -1303,6 +1316,106 @@ document.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// --- Canvas Pan & Zoom (Miro-like) ---
+(function initCanvasPanZoom() {
+  const panel = document.getElementById('canvasPanel');
+  const area = document.getElementById('canvasArea');
+  const zoomLevel = document.getElementById('zoomLevel');
+  if (!panel || !area) return;
+
+  let scale = 1;
+  let panX = 0, panY = 0;
+  let isPanning = false;
+  let startX, startY, startPanX, startPanY;
+  let spaceDown = false;
+
+  function applyTransform() {
+    area.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    if (zoomLevel) zoomLevel.textContent = Math.round(scale * 100) + '%';
+  }
+
+  function zoomTo(newScale, cx, cy) {
+    const clamped = Math.min(2, Math.max(0.2, newScale));
+    // Zoom toward cursor: adjust pan so the point under cursor stays fixed
+    const rect = panel.getBoundingClientRect();
+    const px = (cx !== undefined ? cx : rect.width / 2) - rect.left;
+    const py = (cy !== undefined ? cy : rect.height / 2) - rect.top;
+    panX = px - (px - panX) * (clamped / scale);
+    panY = py - (py - panY) * (clamped / scale);
+    scale = clamped;
+    applyTransform();
+  }
+
+  // Ctrl+Wheel zoom
+  panel.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      zoomTo(scale * delta, e.clientX, e.clientY);
+    } else {
+      // Normal scroll = pan
+      panX -= e.deltaX;
+      panY -= e.deltaY;
+      applyTransform();
+    }
+  }, { passive: false });
+
+  // Space key for pan mode
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && e.target === document.body) {
+      e.preventDefault();
+      spaceDown = true;
+      panel.style.cursor = 'grab';
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+      spaceDown = false;
+      if (!isPanning) panel.style.cursor = '';
+    }
+  });
+
+  // Mouse drag pan (middle-click or space+left-click)
+  panel.addEventListener('pointerdown', (e) => {
+    if (e.button === 1 || (spaceDown && e.button === 0)) {
+      e.preventDefault();
+      isPanning = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startPanX = panX;
+      startPanY = panY;
+      panel.classList.add('panning');
+      panel.setPointerCapture(e.pointerId);
+    }
+  });
+  panel.addEventListener('pointermove', (e) => {
+    if (!isPanning) return;
+    panX = startPanX + (e.clientX - startX);
+    panY = startPanY + (e.clientY - startY);
+    applyTransform();
+  });
+  panel.addEventListener('pointerup', (e) => {
+    if (isPanning) {
+      isPanning = false;
+      panel.classList.remove('panning');
+      panel.style.cursor = spaceDown ? 'grab' : '';
+    }
+  });
+
+  // Prevent middle-click auto-scroll default
+  panel.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
+
+  // Zoom buttons
+  const zoomIn = document.getElementById('zoomIn');
+  const zoomOut = document.getElementById('zoomOut');
+  if (zoomIn) zoomIn.onclick = () => zoomTo(scale * 1.2);
+  if (zoomOut) zoomOut.onclick = () => zoomTo(scale / 1.2);
+  if (zoomLevel) zoomLevel.onclick = () => { scale = 1; panX = 0; panY = 0; applyTransform(); };
+
+  // Expose for scrollTo on artifact creation
+  window._canvasPanZoom = { zoomTo, applyTransform, getScale: () => scale, panTo(x, y) { panX = -x; panY = -y; applyTransform(); } };
+})();
 
 // --- Utility ---
 function escHtml(str) {
