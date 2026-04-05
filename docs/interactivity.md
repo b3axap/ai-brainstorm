@@ -41,7 +41,7 @@ function renderMyViz(data, container) {
 
 | Renderer | Edit | Toggle | Cycle | Add/Delete | Drag |
 |----------|------|--------|-------|------------|------|
-| mindmap | center, branch labels, children | — | — | branches, children | — |
+| mindmap | center, branch labels, children | — | — | branches, children | SVG node drag (mousedown) |
 | table | cells, column headers | — | — | rows | — |
 | presentation | slide titles, bullets | — | — | bullets, slides | — |
 | diagram | mermaid source (code editor) | — | — | — | — |
@@ -97,6 +97,30 @@ The freeform agent's systemPrompt documents this SDK so Claude uses `brainstorm.
 
 SVG `<text>` with `data-edit` → engine injects `<foreignObject>` with `<input>` overlay, adapted for SVG coordinates.
 
+## Mindmap node dragging
+
+Branch and child nodes have `data-mm-node` and class `bs-mm-draggable`. The engine's `attachMindmapDrag()` handles:
+1. **mousedown** on `.bs-mm-draggable` → records start position via `svg.createSVGPoint()` + `getScreenCTM().inverse()`
+2. **mousemove** → updates `<rect>` x/y, `<text>` x/y, and connected `<line>` endpoints in real-time
+3. **mouseup** → emits `branches.{i}._x` / `._y` position patches (or converts string children to objects with `_x/_y`)
+
+Renderer reads `branch._x` / `branch._y` if present, falls back to angle-based layout. Lines use `data-mm-line="branch-{i}"` / `"child-{i}-{j}"` for targeted updates during drag.
+
+## Diagram code editor
+
+"Edit Code" button opens a `bs-code-overlay` over the diagram with a monospace `<textarea>`. Save button (or Ctrl+S) dispatches `bs-mermaid-save` custom event → engine catches it → emits `mermaid` patch → re-render.
+
+## Artifact expand popup
+
+`#artifactExpandModal` — a large (90vw/85vh) modal that renders any artifact at full size with:
+- **Toolbar**: AI Expand, Transform, Copy, PNG, Delete (always visible, not hover-only)
+- **Add/delete buttons** at higher opacity than canvas cards
+- **Ask bar** at the bottom
+- **InteractiveEngine** attached — all data-attribute editing works inside the popup
+- **Real-time sync**: `artifact-updated` events refresh the popup if open
+
+Open via: "Open" button in action bar, or double-click on card header.
+
 ## CSS classes
 
 | Class | Purpose |
@@ -110,4 +134,11 @@ SVG `<text>` with `data-edit` → engine injects `<foreignObject>` with `<input>
 | `.bs-drag-over` | Drop target being hovered |
 | `.bs-interactive` | Clickable toggle/cycle |
 | `.bs-edit-code-btn` | Diagram code editor button |
+| `.bs-code-overlay` | Diagram code editor overlay |
+| `.bs-code-textarea` | Monospace textarea for mermaid source |
+| `.bs-mm-draggable` | Mindmap draggable node group |
 | `.bs-add-slide-btn` | Presentation add slide button |
+| `.expand-modal` | Artifact expand popup container |
+| `.expand-toolbar` | Expand popup toolbar buttons |
+| `.expand-content` | Expand popup body (renderers draw here) |
+| `.expand-loading` | Expand popup loading spinner overlay |

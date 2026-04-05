@@ -73,7 +73,7 @@ Output schemas: each agent's JSON file contains `outputExample`. Key schemas:
 
 **Chat behavior:** Adaptive, no rigid phases. Claude acts as a brainstorming partner. Questions only when needed, with clickable options. JSON fields (`questions`, `suggest`, `offer_canvas`, `canvas_action`) all optional.
 
-**Artifact interaction:** Action bar (hover: Expand/Transform/Ask/Copy/PNG) + inline editing via data-attributes. See [`docs/interactivity.md`](docs/interactivity.md).
+**Artifact interaction:** Action bar (hover: Open/AI Expand/Transform/Ask/Copy/PNG) + inline editing via data-attributes + expand popup (dblclick header or "Open"). See [`docs/interactivity.md`](docs/interactivity.md).
 
 **Artifact positioning:** 2-column grid via `calcArtifactPosition(index)`, 540px width + 40px gap.
 
