@@ -117,6 +117,80 @@ Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 - `--surface` bg, `--border` border, 10px radius, shadow
 - Hover: purple border glow `rgba(108,92,231,.4)`
 
+### Visualization Components
+
+### Timeline
+- **Classes**: `.timeline-container`, `.tl-item`, `.tl-dot`, `.tl-line`, `.tl-date`, `.tl-desc`
+- **Layout**: Vertical list with absolute-positioned dot (12px circle) and 2px line on the left; items padded-left 20px
+- **States**: `.tl-item` supports status classes (e.g. `.done`, `.upcoming`) for dot color
+- **Interactive**: `data-edit` on label/date/description, `data-delete` on items, `data-add` zone at bottom
+
+### Donut Chart
+- **Classes**: `.donut-container`, `.donut-chart`, `.donut-legend`, `.donut-legend-item`, `.donut-legend-dot`, `.donut-center`
+- **Layout**: Flex row — SVG chart (flex-shrink: 0) left + legend column right, gap 20px
+- **States**: No hover states on chart segments; legend items are static
+- **Interactive**: `data-edit` on segment labels/values and center label, `data-delete` on legend items, `data-add` zone
+
+### Kanban
+- **Classes**: `.kanban-board`, `.kanban-col`, `.kanban-col-header`, `.kanban-cards`, `.kanban-card`
+- **Layout**: Flex row of equal-width columns; cards stacked vertically with 5px gap; min-height 180px
+- **States**: `.kanban-card.dragging` (opacity .6), `.kanban-col.drag-over` (accent bg tint)
+- **Interactive**: `data-edit` on column names/card titles, `data-drag-item`/`data-drag-target` for card reorder, `data-delete`, `data-add`
+
+### Matrix 2x2
+- **Classes**: `.matrix-container`, `.matrix-grid`, `.matrix-quad`, `.matrix-quad-label`, `.matrix-chip`
+- **Layout**: 2x2 CSS grid (5px gap); each quadrant has colored border, `--surface2` bg, min-height 80px; chips are inline pill elements
+- **States**: No explicit hover states; chips inherit quadrant color via inline `color-mix()`
+- **Interactive**: `data-edit` on axis labels/quadrant labels/chips, `data-delete` + `data-drag-item`/`data-drag-target` on chips, `data-add` per quadrant
+
+### SWOT
+- **Classes**: `.swot-grid`, `.swot-quad`
+- **Layout**: 2x2 CSS grid (6px gap); quadrants have `--surface2` bg, `--radius-md` corners, 10px padding
+- **States**: No hover states; quadrant identity conveyed by colored bullet markers in list items
+- **Interactive**: `data-edit` on items, `data-delete` on items, `data-add` zone per quadrant
+
+### Pros/Cons
+- **Classes**: `.proscons-container`, `.proscons-grid`, `.proscons-col`, `.proscons-header`, `.proscons-item`, `.proscons-verdict`
+- **Layout**: 2-column CSS grid (10px gap); verdict bar below with `--accent` left border (3px), `--surface2` bg
+- **States**: No hover states; items use green (+) / red (-) icon prefix
+- **Interactive**: `data-edit` on each item and verdict, `data-delete` on items, `data-add` zone per column
+
+### Checklist
+- **Classes**: `.checklist-container`, `.checklist-progress`, `.checklist-bar`, `.checklist-bar-fill`, `.checklist-item`, `.checklist-check`
+- **Layout**: Progress bar (4px height, `--green` fill, animated width 0.3s) at top; items are flex rows with 16px checkbox + text
+- **States**: `.checklist-item.done` — opacity .55, strikethrough text, green check bg; `.checklist-check:hover` — green border
+- **Interactive**: `data-toggle` on checkbox (toggles `done`), `data-edit` on text, `data-delete` on items, `data-add` zone
+
+### Quote Card
+- **Classes**: `.quote-container`, `.quote-tag`, `.quote-text`, `.quote-author`, `.quote-supporting`
+- **Layout**: `--surface2` bg card with `--accent` left border (3px), 16px padding; tag absolutely positioned top-right (9px pill)
+- **States**: No hover states
+- **Interactive**: `data-edit-multiline` on quote text, `data-edit` on author/supporting
+
+### Presentation / Slides
+- **Classes**: `.slides-container`, `.slide-view`, `.slide-nav`, `.slide-dot`
+- **Layout**: Slide view (`--surface2` bg, 20px padding, min-height 120px) + bottom nav bar (flex centered); dots are 6px circles
+- **States**: `.slide-dot.active` — `--accent` bg; nav buttons hover: color `--text`
+- **Interactive**: `data-edit` on slide title and bullets, `data-delete` on bullets, `data-add` zone for bullets; nav via JS click handlers
+
+### File Chips
+- **Classes**: `.file-chip`, `.file-chip-thumb`, `.file-chip-icon`, `.file-chip-name`, `.file-chip-remove`, `.file-preview-bar`
+- **Layout**: Preview bar (flex wrap, `--surface` bg, top border) contains chips; each chip is flex row with 32px thumbnail + name (truncated, max-width 200px)
+- **States**: `.file-chip-remove:hover` — color `--red`
+- **Interactive**: Remove button (x) deletes attachment from pending list
+
+### Mention Dropdown
+- **Classes**: `.mention-dropdown`, `.mention-item`, `.mention-icon`, `.mention-title`, `.mention-type`
+- **Layout**: Fixed-position dropdown (`--surface` bg, `--shadow`, max-height 200px scroll, z-index 600, min-width 200px); items are flex rows with icon + title + type label
+- **States**: `.mention-dropdown.visible` (display: block); `.mention-item:hover` / `.mention-item.active` — `--surface2` bg
+- **Accessibility**: `role="listbox"` on dropdown, `role="option"` on items; keyboard nav via Arrow Up/Down, Enter/Tab to select
+
+### Tags
+- **Classes**: `.tag`, `.tag-green`, `.tag-orange`, `.tag-pink`, `.tag-blue`
+- **Layout**: Inline-block pills — 2px vertical / 8px horizontal padding, `--radius-xs` (4px), `--text-xs` (10px) font
+- **Colors**: Each variant uses matching `--tag-{color}` bg + `--{color}` text (green/orange/pink/blue)
+- **Usage**: Inside table cells, kanban cards, and other renderers for categorical labels
+
 ## Accessibility (WCAG 2.1 AA)
 
 - `--text2` (#9ea3b5): 4.5:1+ contrast on surfaces
