@@ -82,6 +82,18 @@ See [`docs/architecture.md`](docs/architecture.md) for full details.
 | `development` | Active work |
 | `archive` | v0.6 snapshot |
 
+## Contributing
+
+1. Fork the repo, create a branch from `development`
+2. Make changes, test with `npm start` + smoke test (create room → chat → generate viz)
+3. Open a PR into `development`
+
+See [`docs/architecture.md`](docs/architecture.md) for module structure and [`docs/agents.md`](docs/agents.md) for adding new visualization types.
+
+## Issues & Support
+
+[GitHub Issues](https://github.com/b3axap/ai-brainstorm/issues) — bug reports and feature requests.
+
 ## License
 
 MIT

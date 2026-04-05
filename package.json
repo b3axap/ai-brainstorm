@@ -2,10 +2,25 @@
   "name": "ai-brainstorm",
   "version": "1.0.0",
   "description": "Collaborative AI brainstorming with interpreter agents",
+  "license": "MIT",
+  "author": "b3axap",
+  "homepage": "https://github.com/b3axap/ai-brainstorm",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b3axap/ai-brainstorm.git"
+  },
+  "keywords": ["ai", "brainstorm", "claude", "visualization", "collaboration", "socket.io"],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/**/*.test.js",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:integration": "node --test tests/integration/*.test.js",
+    "test:watch": "node --test --watch tests/**/*.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

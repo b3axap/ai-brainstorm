@@ -1,18 +1,22 @@
 {
+  "$id": "https://github.com/b3axap/ai-brainstorm/blob/deploy/agents/_schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Interpreter Agent",
+  "description": "Schema for AI Brainstorm visualization agent configurations. Each JSON file in agents/ defines one visualization type.",
   "type": "object",
-  "required": ["id", "name", "icon", "description", "keywords", "renderer", "systemPrompt"],
+  "required": ["id", "name", "icon", "description", "keywords", "renderer", "systemPrompt", "outputExample"],
+  "additionalProperties": false,
   "properties": {
-    "id": { "type": "string", "pattern": "^[a-z_]+$" },
-    "name": { "type": "string" },
-    "icon": { "type": "string" },
-    "description": { "type": "string" },
-    "keywords": { "type": "array", "items": { "type": "string" } },
-    "renderer": { "type": "string" },
-    "systemPrompt": { "type": "string" },
-    "outputExample": { "type": "object" },
+    "id": { "type": "string", "pattern": "^[a-z_]+$", "description": "Unique agent identifier (lowercase + underscores)" },
+    "name": { "type": "string", "description": "Display name shown in viz picker" },
+    "icon": { "type": "string", "description": "Single emoji icon" },
+    "description": { "type": "string", "description": "Short description for the picker UI" },
+    "keywords": { "type": "array", "items": { "type": "string" }, "description": "Keywords Claude uses to suggest this agent" },
+    "renderer": { "type": "string", "description": "Key in the renderers object (public/renderers.js)" },
+    "systemPrompt": { "type": "string", "description": "Instructions for Claude. Must end with JSON schema to output." },
+    "outputExample": { "type": "object", "description": "Example JSON output that Claude uses as reference" },
     "externalAPI": {
+      "description": "External API config (null for Claude-based agents)",
       "oneOf": [
         { "type": "null" },
         {
