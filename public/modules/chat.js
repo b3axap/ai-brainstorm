@@ -132,13 +132,32 @@ export function startStreaming() {
 
 export function appendStream(chunk) {
   if (!streamingActive) startStreaming();
-  const msgEl = streamingMsgId ? document.getElementById(`msg-${streamingMsgId}`) : null;
-  if (msgEl) {
-    const bubble = msgEl.querySelector('.msg-bubble');
-    if (bubble) bubble.textContent += chunk;
-    const chatMessages = document.getElementById('chatMessages');
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+  if (!streamingMsgId) return;
+  const msgEl = document.getElementById(`msg-${streamingMsgId}`);
+  if (!msgEl) {
+    // DOM element gone (e.g., screen changed) — reset state
+    streamingMsgId = null;
+    streamingActive = false;
+    return;
   }
+  const bubble = msgEl.querySelector('.msg-bubble');
+  if (bubble) bubble.textContent += chunk;
+  const chatMessages = document.getElementById('chatMessages');
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+export function resetStreaming() {
+  if (streamingMsgId) {
+    const msgEl = document.getElementById(`msg-${streamingMsgId}`);
+    if (msgEl) {
+      const bubble = msgEl.querySelector('.msg-bubble');
+      if (bubble && bubble.textContent.trim()) {
+        bubble.innerHTML += '<span class="stream-interrupted"> (interrupted)</span>';
+      }
+    }
+  }
+  streamingMsgId = null;
+  streamingActive = false;
 }
 
 export function endStreaming(fullMessage) {

@@ -8,6 +8,9 @@ class InteractiveEngine {
     this.socket = socket;
     this.roomId = (typeof state !== 'undefined' && state.roomId) ? state.roomId : null;
     this.body = card.querySelector('.artifact-body');
+    this._destroyed = false;
+    this._listeners = [];
+    this._iframeForward = null;
     if (!this.body) return;
 
     // Clean up previous engine instance
@@ -16,7 +19,6 @@ class InteractiveEngine {
     }
     this.body._bsEngine = this;
 
-    this._listeners = [];
     this.scan();
   }
 
@@ -53,15 +55,19 @@ class InteractiveEngine {
 
   // --- Scan container for data-attributes and attach handlers ---
   scan() {
-    this.attachEditHandlers();
-    this.attachMultilineEditHandlers();
-    this.attachToggleHandlers();
-    this.attachCycleHandlers();
-    this.attachAddHandlers();
-    this.attachDeleteHandlers();
-    this.attachDragHandlers();
-    this.attachIframeHandlers();
-    this.attachCustomEvents();
+    try {
+      this.attachEditHandlers();
+      this.attachMultilineEditHandlers();
+      this.attachToggleHandlers();
+      this.attachCycleHandlers();
+      this.attachAddHandlers();
+      this.attachDeleteHandlers();
+      this.attachDragHandlers();
+      this.attachIframeHandlers();
+      this.attachCustomEvents();
+    } catch (err) {
+      console.warn('[InteractiveEngine] scan error:', err);
+    }
   }
 
   // --- INLINE EDIT: data-edit="path" ---
@@ -535,11 +541,16 @@ class InteractiveEngine {
 
   // --- Cleanup ---
   destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
     this._listeners.forEach(([el, evt, fn]) => {
-      el.removeEventListener(evt, fn);
+      try { el.removeEventListener(evt, fn); } catch {}
     });
     this._listeners = [];
-    if (this.body) this.body._bsEngine = null;
+    this._iframeForward = null;
+    if (this.body && this.body._bsEngine === this) {
+      this.body._bsEngine = null;
+    }
   }
 }
 

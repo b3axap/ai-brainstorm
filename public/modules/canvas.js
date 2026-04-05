@@ -61,7 +61,12 @@ export function renderArtifactCard(artifact) {
   // Render content
   const body = document.getElementById(`abody-${artifact.id}`);
   if (typeof renderArtifact === 'function') {
-    renderArtifact(artifact.renderer || artifact.type, artifact.data, body);
+    try {
+      renderArtifact(artifact.renderer || artifact.type, artifact.data, body);
+    } catch (err) {
+      console.error('[renderArtifactCard] Render error:', err);
+      body.innerHTML = '<div style="padding:12px;color:#f87171;">Render error</div>';
+    }
   }
 
   setupArtifactActions(card, artifact);
@@ -274,7 +279,7 @@ function openArtifactExpand(artifactId) {
 
   if (expandState.engine) expandState.engine.destroy();
   const bodyWrap = modal.querySelector('.expand-body');
-  const fakeCard = { querySelector: (sel) => sel === '.artifact-body' ? bodyWrap : null };
+  const fakeCard = _makeFakeCard(bodyWrap);
   if (window.InteractiveEngine) {
     expandState.engine = new InteractiveEngine(fakeCard, art, socket);
   }
@@ -296,7 +301,26 @@ export function closeArtifactExpand() {
   if (dd) dd.remove();
 }
 
+let _expandRefreshTimer = null;
+
 export function refreshExpandPopup() {
+  if (!expandState.artifactId) return;
+  if (_expandRefreshTimer) clearTimeout(_expandRefreshTimer);
+  _expandRefreshTimer = setTimeout(() => {
+    _expandRefreshTimer = null;
+    _doRefreshExpandPopup();
+  }, 50);
+}
+
+function _makeFakeCard(bodyWrap) {
+  return {
+    querySelector: (sel) => sel === '.artifact-body' ? bodyWrap : null,
+    querySelectorAll: () => [],
+    closest: () => null
+  };
+}
+
+function _doRefreshExpandPopup() {
   if (!expandState.artifactId) return;
   const art = state.artifacts.find(a => a.id === expandState.artifactId);
   if (!art) { closeArtifactExpand(); return; }
@@ -307,12 +331,17 @@ export function refreshExpandPopup() {
   modal.querySelector('.expand-title').textContent = art.title || 'Untitled';
 
   if (typeof renderArtifact === 'function') {
-    renderArtifact(art.renderer || art.type, art.data, content);
+    try {
+      renderArtifact(art.renderer || art.type, art.data, content);
+    } catch (err) {
+      console.error('[refreshExpand] Render error:', err);
+      content.innerHTML = '<div style="padding:20px;color:#f87171;">Render error</div>';
+    }
   }
 
   if (expandState.engine) expandState.engine.destroy();
   const bodyWrap = modal.querySelector('.expand-body');
-  const fakeCard = { querySelector: (sel) => sel === '.artifact-body' ? bodyWrap : null };
+  const fakeCard = _makeFakeCard(bodyWrap);
   if (window.InteractiveEngine) {
     expandState.engine = new InteractiveEngine(fakeCard, art, socket);
     expandState.engine.forwardUpdate(art.data);

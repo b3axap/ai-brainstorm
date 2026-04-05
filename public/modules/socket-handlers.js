@@ -2,7 +2,7 @@
 import { state, socket } from './state.js';
 import { showScreen, showToast, escHtml } from './utils.js';
 import { showLandingError } from './landing.js';
-import { addChatMessage, appendStream, endStreaming } from './chat.js';
+import { addChatMessage, appendStream, endStreaming, resetStreaming } from './chat.js';
 import {
   renderArtifactCard, removeArtifactUpdating, updateUserLists,
   updateRoomCode, refreshExpandPopup, closeArtifactExpand, getExpandArtifactId
@@ -10,10 +10,13 @@ import {
 import { openVizPicker } from './viz-picker.js';
 
 export function initSocketHandlers() {
+  const engineDebounce = new Map();
+
   socket.on('connect_error', () => showToast('Connection error — retrying...'));
 
   socket.on('disconnect', (reason) => {
     state.generating = false;
+    resetStreaming();
     document.getElementById('typingIndicator').classList.remove('visible');
     if (reason !== 'io client disconnect') showToast('Disconnected — reconnecting...');
   });
@@ -244,7 +247,12 @@ export function initSocketHandlers() {
 
     const body = document.getElementById(`abody-${artifactId}`);
     if (body && typeof renderArtifact === 'function') {
-      renderArtifact(art.renderer || art.type, data, body);
+      try {
+        renderArtifact(art.renderer || art.type, data, body);
+      } catch (err) {
+        console.error(`[artifact-updated] Render error:`, err);
+        body.innerHTML = '<div style="padding:12px;color:#f87171;">Render error — try refreshing</div>';
+      }
     }
 
     const card = document.getElementById(`artifact-${artifactId}`);
@@ -255,8 +263,16 @@ export function initSocketHandlers() {
         if (titleEl) titleEl.textContent = title;
       }
       if (window.InteractiveEngine) {
-        const engine = new InteractiveEngine(card, art, socket);
-        engine.forwardUpdate(data);
+        // Debounce engine recreation for rapid updates
+        if (engineDebounce.has(artifactId)) clearTimeout(engineDebounce.get(artifactId));
+        engineDebounce.set(artifactId, setTimeout(() => {
+          engineDebounce.delete(artifactId);
+          const currentCard = document.getElementById(`artifact-${artifactId}`);
+          if (currentCard) {
+            const engine = new InteractiveEngine(currentCard, art, socket);
+            engine.forwardUpdate(data);
+          }
+        }, 50));
       }
     }
 

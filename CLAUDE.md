@@ -58,7 +58,7 @@ public/
 | **Architecture** | [`docs/architecture.md`](docs/architecture.md) | Understanding module structure, data flow, adding new features |
 | **Adding agents** | [`docs/agents.md`](docs/agents.md) | Creating new visualization types (JSON + renderer + CSS) |
 | **Interactivity system** | [`docs/interactivity.md`](docs/interactivity.md) | Editing renderers, data-attribute protocol, InteractiveEngine |
-| **Design system** | [`docs/design-system.md`](docs/design-system.md) | CSS changes, styling, Figma reference, accessibility |
+| **Design system** | [`docs/design-system.md`](docs/design-system.md) | CSS changes, styling, Figma reference, accessibility, animations, component states, keyboard shortcuts, feedback states |
 | **Socket.IO API** | [`docs/socket-api.md`](docs/socket-api.md) | Client-server communication, event payloads, data model |
 
 ## Agent Catalog (15 agents)

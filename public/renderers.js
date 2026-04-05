@@ -23,7 +23,12 @@ const renderers = {
 function renderArtifact(type, data, container) {
   const renderer = renderers[type];
   if (renderer) {
-    renderer(data, container);
+    try {
+      renderer(data, container);
+    } catch (err) {
+      console.error(`[Renderer:${type}] Error:`, err);
+      container.innerHTML = `<div style="padding:20px;color:#f87171;">Render error in ${type}</div>`;
+    }
   } else {
     container.innerHTML = `<div style="padding:20px;color:var(--text2);">Unknown renderer: ${type}</div>`;
   }
