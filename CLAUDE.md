@@ -74,7 +74,7 @@ public/
 | `diagram` | 🔀 | Process flows |
 | `html_guide` | 📖 | Tutorials |
 | `image` | 🎨 | Illustrations (placeholder) |
-| `freeform` | ✨ | Creative HTML |
+| `freeform` | ✨ | **Custom Visualization** — any HTML/CSS/JS (12000 tokens) |
 | `timeline` | 📅 | Roadmaps |
 | `swot` | ⚡ | Strategic analysis |
 | `kanban` | 📋 | Task boards |
@@ -96,7 +96,7 @@ Output schemas: each agent's JSON file contains `outputExample`. Key schemas:
 2. Send message → Claude streams response → `claude-done` with optional questions/suggestions
 3. ➕ new idea → `isNewIdea: true` → Claude connects it to existing brainstorm
 4. Claude may return `canvas_action` → confirmation button → `execute-canvas-action`
-5. Pick visualization → `generate-artifact` → Claude generates JSON → renders on canvas
+5. Pick visualization → template or custom description → `generate-artifact` (with `customPrompt` for freeform) → Claude generates JSON/HTML → renders on canvas
 6. Interact with artifact → action bar or inline edit → `artifact-data-patch` / `artifact-array-op`
 
 ## Key Patterns
@@ -151,6 +151,8 @@ npm install && npm start  # http://localhost:5000
 11. **Entry point is `server/index.js`** — not `server.js` (legacy). `package.json` scripts point here.
 12. **Client uses ES modules** — `<script type="module" src="app.js">`. Use `import`/`export`, NOT `window.App` globals (that approach was reverted in commit d378843).
 13. **All config in `config.js`** — model name, grid layout, limits, ports. Don't hardcode these values in handlers.
+14. **Per-agent token limit** — agents can set `maxTokens` in their JSON to override `config.claude.generationMaxTokens`. `freeform` uses 12000 (vs default 3000). Applied in `generation.js`: `agent.maxTokens || config.claude.generationMaxTokens`.
+15. **Viz picker is textarea-first** — custom visualization textarea is the primary UX element (top of modal). Template agents are below as "Quick Templates". Freeform is excluded from the template grid to avoid duplication.
 
 ## Helper Functions
 

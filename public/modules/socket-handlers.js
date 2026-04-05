@@ -212,9 +212,39 @@ export function initSocketHandlers() {
 
   socket.on('artifact-generating', ({ type }) => {
     state.generating = true;
+
+    // Show placeholder card for freeform (longer generation)
+    if (type === 'freeform') {
+      const existing = document.getElementById('generating-placeholder');
+      if (!existing) {
+        const idx = state.artifacts.length;
+        const col = idx % 2, row = Math.floor(idx / 2);
+        const pos = { x: 40 + col * (540 + 40), y: 40 + row * (360 + 40) };
+        const placeholder = document.createElement('div');
+        placeholder.className = 'artifact-card generating-placeholder';
+        placeholder.id = 'generating-placeholder';
+        placeholder.style.left = pos.x + 'px';
+        placeholder.style.top = pos.y + 'px';
+        placeholder.innerHTML = `
+          <div class="artifact-head">
+            <span class="a-icon">✨</span>
+            <span class="a-title">Generating custom visualization...</span>
+          </div>
+          <div class="artifact-body" style="display:flex;align-items:center;justify-content:center;min-height:200px;">
+            <div class="gen-placeholder-content">
+              <div class="gen-placeholder-spinner"></div>
+              <div class="gen-placeholder-text">Creating something amazing...</div>
+            </div>
+          </div>
+        `;
+        document.getElementById('canvasContent')?.appendChild(placeholder);
+        if (window._canvasPanZoom) window._canvasPanZoom.panTo(pos.x - 40, pos.y - 40);
+      }
+    }
   });
 
   socket.on('artifact-created', ({ artifact }) => {
+    document.getElementById('generating-placeholder')?.remove();
     state.artifacts.push(artifact);
     state.generating = false;
     const card = renderArtifactCard(artifact);
@@ -301,6 +331,7 @@ export function initSocketHandlers() {
   });
 
   socket.on('generation-error', ({ message }) => {
+    document.getElementById('generating-placeholder')?.remove();
     state.generating = false;
     showToast('Error: ' + message);
     document.getElementById('typingIndicator').classList.remove('visible');

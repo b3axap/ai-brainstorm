@@ -72,7 +72,7 @@ async function handleArtifactGeneration(room, type, userName, socket, io, refere
   try {
     const response = await claude.getClient().messages.create({
       model: config.claude.model,
-      max_tokens: config.claude.generationMaxTokens,
+      max_tokens: agent.maxTokens || config.claude.generationMaxTokens,
       system: fullSystem,
       messages
     });
@@ -93,7 +93,7 @@ async function handleArtifactGeneration(room, type, userName, socket, io, refere
           console.log(`Retrying ${type} generation (invalid JSON)...`);
           const retry = await claude.getClient().messages.create({
             model: config.claude.model,
-            max_tokens: config.claude.generationMaxTokens,
+            max_tokens: agent.maxTokens || config.claude.generationMaxTokens,
             system: fullSystem + '\n\nCRITICAL: Output ONLY valid JSON. No markdown, no explanation, no code fences. Just the JSON object.',
             messages
           });

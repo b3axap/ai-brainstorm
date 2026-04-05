@@ -100,9 +100,24 @@
 <!-- VISUALIZATION PICKER MODAL -->
 <div class="modal-overlay" id="vizPickerModal" role="dialog" aria-modal="true" aria-label="Choose visualizations">
   <div class="modal modal-wide">
-    <h2>🎨 Choose Visualizations</h2>
-    <p class="modal-subtitle">Select one or more. Claude's suggestions are pre-selected.</p>
+    <h2>🎨 Create Visualization</h2>
 
+    <!-- Custom visualization section (primary) -->
+    <div class="viz-custom-section">
+      <div class="viz-custom-heading">✨ Describe your visualization</div>
+      <div class="viz-custom-subtitle">Describe any visualization you want — Claude will create it from scratch with full interactivity</div>
+      <textarea class="viz-custom-textarea" id="vizCustomTextarea" placeholder="e.g. Interactive budget calculator with sliders, animated comparison chart, decision tree explorer..." rows="3"></textarea>
+      <div class="viz-example-chips" id="vizExampleChips">
+        <span class="viz-example-chip" data-prompt="Interactive ROI calculator with input sliders">📊 ROI Calculator</span>
+        <span class="viz-example-chip" data-prompt="Animated comparison chart with toggle filters">📈 Comparison Chart</span>
+        <span class="viz-example-chip" data-prompt="Decision tree with clickable branches and outcomes">🌳 Decision Tree</span>
+        <span class="viz-example-chip" data-prompt="Interactive dashboard with KPI cards and mini-charts">📋 Dashboard</span>
+      </div>
+    </div>
+
+    <!-- Quick templates (secondary) -->
+    <div class="viz-templates-heading">Quick Templates</div>
+    <p class="modal-subtitle">Or pick a template. Claude's suggestions are pre-selected.</p>
     <div class="viz-grid" id="vizGrid">
       <!-- Populated by JS: agent cards with checkboxes -->
     </div>
@@ -113,17 +128,9 @@
       <div class="viz-ref-grid" id="vizRefGrid"></div>
     </div>
 
-    <div class="viz-custom">
-      <label class="viz-custom-label">
-        <input type="checkbox" id="vizCustomCheck">
-        <span>✏️ Custom visualization</span>
-      </label>
-      <input class="input" id="vizCustomInput" type="text" placeholder="Describe what you want to see..." disabled>
-    </div>
-
     <div class="viz-footer">
       <button class="btn" id="vizCancelBtn">Cancel</button>
-      <button class="btn btn-primary" id="vizGenerateBtn" disabled>Generate Selected (0)</button>
+      <button class="btn btn-primary" id="vizGenerateBtn" disabled>Generate (0)</button>
     </div>
   </div>
 </div>

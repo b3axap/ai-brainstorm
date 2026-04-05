@@ -15,6 +15,11 @@
     "renderer": { "type": "string", "description": "Key in the renderers object (public/renderers.js)" },
     "systemPrompt": { "type": "string", "description": "Instructions for Claude. Must end with JSON schema to output." },
     "outputExample": { "type": "object", "description": "Example JSON output that Claude uses as reference" },
+    "maxTokens": {
+      "type": "integer",
+      "minimum": 1000,
+      "description": "Per-agent override for max_tokens (defaults to config.claude.generationMaxTokens). Use higher values for agents that generate complex HTML."
+    },
     "externalAPI": {
       "description": "External API config (null for Claude-based agents)",
       "oneOf": [

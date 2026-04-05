@@ -81,18 +81,25 @@ User types → chat.js sendChatMessage()
 ### Artifact Generation
 
 ```
-User picks visualization type → viz-picker.js
-  → socket.emit('generate-artifact')
+User opens viz picker → viz-picker.js
+  Two paths:
+  1. Template: checkbox selection → socket.emit('generate-artifact', { type })
+  2. Custom: textarea description → socket.emit('generate-artifact', { type: 'freeform', customPrompt })
+
     → server: handlers/artifact.js
       → claude/generation.js handleArtifactGeneration()
         → loads agent JSON (systemPrompt + outputExample)
-        → Claude generates JSON data
+        → max_tokens: agent.maxTokens || config default (freeform uses 12000)
+        → customPrompt appended to system prompt if provided
+        → Claude generates JSON data (or full HTML for freeform)
         → retry logic if JSON parsing fails
         → calcArtifactPosition() for 2-column grid
         → io.to(roomId).emit('artifact-created')
   → client: socket-handlers.js
+    → for freeform: shows generating placeholder card with pulse animation
     → canvas.js renderArtifactCard()
       → renderers.js renders HTML/SVG with data-* attributes
+      → freeform: iframe with sandbox="allow-scripts" + Brainstorm SDK
       → new InteractiveEngine(card, artifact, socket)
       → pan canvas to new artifact
 ```

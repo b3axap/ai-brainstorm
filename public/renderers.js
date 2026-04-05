@@ -323,7 +323,19 @@ function renderImage(data, container) {
 // --- FREEFORM ---
 function renderFreeform(data, container) {
   if (!data.html || data.html.length < 20) {
-    container.innerHTML = '<div style="color:var(--text2);padding:20px;">Failed to generate visualization. Try again.</div>';
+    // Error with retry option
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'color:var(--text2);padding:20px;text-align:center;';
+    errorDiv.innerHTML = `
+      <div style="font-size:24px;margin-bottom:8px;">⚠️</div>
+      <div style="margin-bottom:12px;">Failed to generate visualization.</div>
+      <button onclick="this.closest('.artifact-card')?.querySelector('[data-action=expand]')?.click()"
+        style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent-a15);color:var(--accent2);cursor:pointer;font-family:inherit;">
+        Try Again
+      </button>
+    `;
+    container.innerHTML = '';
+    container.appendChild(errorDiv);
     return;
   }
 
@@ -333,27 +345,50 @@ function renderFreeform(data, container) {
   const iframe = document.createElement('iframe');
   iframe.className = 'freeform-iframe';
   iframe.sandbox = 'allow-scripts';
+  iframe.style.opacity = '0';
+  iframe.style.transition = 'opacity 0.3s ease';
+
+  // Check if we're in expand popup — use flexible height
+  const inExpand = container.closest('.expand-content');
 
   const errorTimeout = setTimeout(() => {
     try {
       if (document.contains(wrapper) && (!iframe.contentDocument || !iframe.contentDocument.body || iframe.contentDocument.body.innerHTML.length < 10)) {
-        wrapper.innerHTML = '<div style="color:var(--text2);padding:20px;">Visualization failed to render.</div>';
+        wrapper.innerHTML = '<div style="color:var(--text2);padding:20px;text-align:center;">Visualization failed to render. <button onclick="location.reload()" style="color:var(--accent2);background:none;border:none;cursor:pointer;text-decoration:underline;">Reload</button></div>';
       }
     } catch {}
-  }, 5000);
+  }, 8000);
 
   iframe.onload = () => {
     clearTimeout(errorTimeout);
+    iframe.style.opacity = '1';
     try {
-      const h = iframe.contentDocument.body.scrollHeight;
-      if (h > 50) iframe.style.height = Math.min(h + 20, 700) + 'px';
+      const body = iframe.contentDocument.body;
+      const h = body.scrollHeight;
+      if (!inExpand) {
+        // Card view: cap height at 700px
+        if (h > 50) iframe.style.height = Math.min(h + 20, 700) + 'px';
+      }
+      // Use ResizeObserver for dynamic content that renders asynchronously
+      if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(() => {
+          try {
+            const newH = body.scrollHeight;
+            if (!inExpand && newH > 50) {
+              iframe.style.height = Math.min(newH + 20, 700) + 'px';
+            }
+          } catch {}
+        });
+        ro.observe(body);
+        // Cleanup after 30s to avoid indefinite observation
+        setTimeout(() => ro.disconnect(), 30000);
+      }
     } catch {}
   };
 
   wrapper.appendChild(iframe);
   container.innerHTML = '';
   container.appendChild(wrapper);
-  // Inject SDK into freeform HTML
   iframe.srcdoc = BRAINSTORM_SDK_SCRIPT + data.html;
 }
 

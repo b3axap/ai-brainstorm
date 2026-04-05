@@ -204,7 +204,7 @@ Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 |-------|------|-------------|
 | `1. Landing Page` | 1440×900 | Centered card: name input, Create Room, join with code |
 | `00 — Workspace (Split-View)` | 1440×900 | Chat left (350px) + resize handle + canvas right. Header: room code `<button>` + user list. No header action buttons. |
-| `00 — Viz Picker Modal` | 1440×900 | Overlay + modal: 4×4 agent grid with checkboxes, pre-selected suggestions, custom viz input, Cancel / Generate (N) |
+| `00 — Viz Picker Modal` | 1440×900 | Overlay + modal: custom viz textarea (top, accent border-left) with example chips, 4-col template grid below, reference artifacts, Cancel / Generate (N) |
 | `00 — Mobile: Chat View` | 375×812 | Full-width chat, bottom tab bar (💬 Chat / 🎨 Canvas) |
 | `00 — Mobile: Canvas View` | 375×812 | Artifact cards on grid, bottom tab bar |
 
@@ -398,6 +398,7 @@ Selected: `.clarify-option-btn.selected`, `.viz-card.selected`, `.viz-ref-chip.s
 | Key | Context | Action |
 |-----|---------|--------|
 | `Escape` | Modal open | Close modal |
+| `Ctrl+Enter` | Textarea focused | Trigger generate |
 
 ---
 

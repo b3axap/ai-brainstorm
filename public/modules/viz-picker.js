@@ -15,16 +15,30 @@ export function initVizPicker() {
     }
   });
 
-  document.getElementById('vizCustomCheck').onchange = (e) => {
-    document.getElementById('vizCustomInput').disabled = !e.target.checked;
-    if (e.target.checked) document.getElementById('vizCustomInput').focus();
+  // Example chips populate textarea on click
+  document.getElementById('vizExampleChips').onclick = (e) => {
+    const chip = e.target.closest('.viz-example-chip');
+    if (!chip) return;
+    const textarea = document.getElementById('vizCustomTextarea');
+    textarea.value = chip.dataset.prompt;
+    textarea.focus();
     updateVizGenerateBtn();
+  };
+
+  // Textarea input updates button
+  document.getElementById('vizCustomTextarea').oninput = updateVizGenerateBtn;
+
+  // Ctrl+Enter in textarea triggers generate
+  document.getElementById('vizCustomTextarea').onkeydown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('vizGenerateBtn').click();
+    }
   };
 
   document.getElementById('vizGenerateBtn').onclick = () => {
     const selected = getSelectedVizTypes();
-    const customText = document.getElementById('vizCustomCheck').checked
-      ? document.getElementById('vizCustomInput').value.trim() : '';
+    const customText = document.getElementById('vizCustomTextarea').value.trim();
     const refIds = getSelectedRefIds();
 
     if (selected.length === 0 && !customText) return;
@@ -35,27 +49,24 @@ export function initVizPicker() {
     });
 
     if (customText) {
-      socket.emit('send-message', { roomId: state.roomId, content: customText });
-      socket.emit('generate-artifact', { roomId: state.roomId, type: 'freeform', referenceIds: refIds });
+      socket.emit('generate-artifact', { roomId: state.roomId, type: 'freeform', referenceIds: refIds, customPrompt: customText });
     }
 
     const count = selected.length + (customText ? 1 : 0);
     showToast(`Generating ${count} visualization${count > 1 ? 's' : ''}...`);
   };
-
-  document.getElementById('vizCustomInput').oninput = updateVizGenerateBtn;
 }
 
 export function openVizPicker(preSelected) {
   state.pendingSuggestions = preSelected || [];
   populateVizGrid();
   populateVizRefs();
-  document.getElementById('vizCustomCheck').checked = false;
-  document.getElementById('vizCustomInput').value = '';
-  document.getElementById('vizCustomInput').disabled = true;
+  document.getElementById('vizCustomTextarea').value = '';
   const modal = document.getElementById('vizPickerModal');
   modal.classList.add('active');
   _releaseFocusTrap = trapFocus(modal);
+  // Focus textarea by default for custom viz
+  setTimeout(() => document.getElementById('vizCustomTextarea').focus(), 100);
   updateVizGenerateBtn();
 }
 
@@ -68,6 +79,8 @@ function populateVizGrid() {
   const grid = document.getElementById('vizGrid');
   grid.innerHTML = '';
   state.agents.forEach(agent => {
+    // Skip freeform from template grid — it's now the custom section
+    if (agent.id === 'freeform') return;
     const isPreSelected = state.pendingSuggestions.includes(agent.id);
     const card = document.createElement('label');
     card.className = `viz-card${isPreSelected ? ' selected' : ''}`;
@@ -114,10 +127,9 @@ function getSelectedRefIds() {
 
 function updateVizGenerateBtn() {
   const selected = getSelectedVizTypes();
-  const hasCustom = document.getElementById('vizCustomCheck').checked
-    && document.getElementById('vizCustomInput').value.trim();
+  const hasCustom = document.getElementById('vizCustomTextarea').value.trim().length > 0;
   const count = selected.length + (hasCustom ? 1 : 0);
   const btn = document.getElementById('vizGenerateBtn');
   btn.disabled = count === 0;
-  btn.textContent = count > 0 ? `Generate Selected (${count})` : 'Generate Selected (0)';
+  btn.textContent = count > 0 ? `Generate (${count})` : 'Generate (0)';
 }

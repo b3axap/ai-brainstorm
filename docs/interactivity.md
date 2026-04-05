@@ -71,7 +71,9 @@ All ops broadcast `artifact-updated` with full data.
 
 ## Brainstorm SDK (freeform / html_guide iframes)
 
-Iframes get `window.brainstorm` via `postMessage`:
+Iframes get `window.brainstorm` via `postMessage`. The SDK script is defined as `BRAINSTORM_SDK_SCRIPT` in `renderers.js` (lines 611-658) and prepended to the iframe's `srcdoc`.
+
+### SDK API
 
 ```js
 brainstorm.markEditable(element, 'path.to.field');  // make text editable
@@ -81,6 +83,33 @@ brainstorm.delete('arrayPath', index);               // remove
 brainstorm.onUpdate(data => { /* re-render */ });    // react to others
 const data = await brainstorm.getData();             // current data
 ```
+
+### How SDK communicates with the parent
+
+The iframe uses `postMessage` to talk to `InteractiveEngine` (in `interactive.js`, `attachIframeHandlers`):
+
+1. **iframe → parent**: `postMessage({ type: 'bs-patch', path, value })` or `bs-array-op`
+2. **parent → iframe**: `postMessage({ type: 'bs-data-update', data })` when another user edits
+3. **iframe → parent**: `postMessage({ type: 'bs-get-data' })` → parent replies with `bs-data-response`
+
+### Recommended pattern for custom visualizations
+
+The freeform agent's system prompt teaches Claude the **state + render** pattern:
+
+```js
+const state = { title: 'My Viz', items: [] };
+function render() {
+  document.getElementById('app').innerHTML = `...`;
+  brainstorm.markEditable(el, 'title');
+  state.items.forEach((item, i) => {
+    brainstorm.markEditable(itemEl, `items.${i}.text`);
+  });
+}
+brainstorm.onUpdate(data => { Object.assign(state, data); render(); });
+render();
+```
+
+This ensures collaborative edits from other users trigger a full re-render with the updated data.
 
 The freeform agent's systemPrompt documents this SDK so Claude uses `brainstorm.markEditable()` automatically.
 

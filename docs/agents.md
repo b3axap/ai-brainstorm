@@ -137,8 +137,56 @@ keywords:     string[]
 renderer:     string (must match renderers object key)
 systemPrompt: string
 outputExample: object (structure matches what Claude outputs)
+maxTokens:    integer (optional, min 1000) — per-agent token limit override
 externalAPI:  null | { provider, endpoint, envKey }
 ```
+
+### `maxTokens` (Per-Agent Token Override)
+
+By default, agents use `config.claude.generationMaxTokens` (3000). Set `maxTokens` in the agent JSON to override this for agents that need more output tokens (e.g., `freeform` uses 12000 for complex HTML generation).
+
+```json
+{
+  "id": "freeform",
+  "maxTokens": 12000,
+  ...
+}
+```
+
+The override is applied in `server/claude/generation.js`: `agent.maxTokens || config.claude.generationMaxTokens`.
+
+## Custom Visualization Agent (freeform)
+
+The `freeform` agent is the primary way users create custom visualizations. Unlike template agents that output structured JSON, freeform outputs `{title, html}` — a full HTML document rendered in a sandboxed iframe.
+
+### How it works
+1. User describes what they want in the viz picker textarea (or chat analysis suggests it)
+2. Server sends `customPrompt` + conversation context to Claude with the freeform system prompt
+3. Claude generates a complete HTML/CSS/JS visualization (up to 12000 tokens)
+4. Client renders it in an iframe with `sandbox="allow-scripts"` + Brainstorm SDK injected
+
+### System prompt structure
+The freeform prompt teaches Claude:
+- **State + Render pattern**: central `state` object, `render()` function that rebuilds DOM
+- **Interactive patterns**: tabs, filters, tooltips, SVG charts, drag, sliders, etc.
+- **Design system**: dark theme colors, spacing, typography matching the app
+- **Brainstorm SDK**: `markEditable()` for collaborative text editing
+- **Rules**: self-contained, no CDN, production quality
+
+### Tuning guide — improving output quality
+To improve what Claude generates, edit `agents/freeform.json`'s `systemPrompt`:
+
+- **Add more pattern examples**: If Claude often misses a pattern (e.g., responsive tables), add a concise example in the "INTERACTIVE PATTERNS" section
+- **Strengthen requirements**: If output quality is inconsistent, make rules more explicit (e.g., "MUST include at least one hover effect per interactive element")
+- **Adjust design tokens**: Update color/spacing values if the design system changes
+- **Add/remove SDK instructions**: If collaborative editing isn't needed for certain viz types, you can soften the SDK requirement
+- **Token limit**: Adjust `maxTokens` in the JSON (12000 is good for complex visualizations; reduce to 8000 if cost is a concern)
+
+### Limitations
+- No external libraries (iframe sandbox blocks network)
+- No persistent state (refreshing re-renders from last saved data)
+- Complex 3D graphics or large datasets may exceed token limits
+- SVG charts must be hand-coded (no D3/Chart.js)
 
 ## Existing Output Schemas
 
@@ -156,7 +204,7 @@ externalAPI:  null | { provider, endpoint, envKey }
 | donut_chart | `{title, segments: [{label, value}], center}` |
 | quote_card | `{quote, author, tag}` |
 | diagram | `{title, mermaid: "graph LR; ..."}` |
-| freeform | `{html, css, js}` (rendered in iframe with Brainstorm SDK) |
+| freeform | `{title, html}` (custom HTML rendered in iframe with Brainstorm SDK, 12000 tokens) |
 | html_guide | `{html, css, js}` (rendered in iframe with Brainstorm SDK) |
 | image | `{prompt, style}` (placeholder — no API connected) |
 
