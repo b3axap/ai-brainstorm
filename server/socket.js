@@ -1,6 +1,7 @@
 // Socket.IO event router — thin dispatcher, no business logic
 const { handleJoinRoom, handleDisconnect } = require('./handlers/room');
 const { handleSendMessage } = require('./handlers/chat');
+const { handleImportSession, handleImportToRoom } = require('./handlers/session');
 const {
   handleGenerateArtifact,
   handleMoveArtifact,
@@ -24,6 +25,8 @@ function initSocket(io) {
     socket.on('artifact-array-op', (data) => handleArrayOp(socket, io, data));
     socket.on('delete-artifact', (data) => handleDeleteArtifact(socket, io, data));
     socket.on('execute-canvas-action', (data) => handleExecuteCanvasAction(socket, io, data));
+    socket.on('import-session', (data) => handleImportSession(socket, io, data));
+    socket.on('import-to-room', (data) => handleImportToRoom(socket, io, data));
     socket.on('disconnect', () => handleDisconnect(socket, io));
   });
 }

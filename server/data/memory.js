@@ -1,5 +1,5 @@
-// In-memory data store — same as current behavior, extracted as module
-// Will be replaced/supplemented by sqlite.js in Phase 3
+// In-memory data store — clean CRUD interface
+// Persistence deferred pending auth. Interface is ready for drop-in replacement.
 
 const rooms = {};
 

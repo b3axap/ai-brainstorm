@@ -1,6 +1,6 @@
 # Socket.IO Event Contract
 
-**Server handlers:** `server/handlers/` (room.js, chat.js, artifact.js)
+**Server handlers:** `server/handlers/` (room.js, chat.js, artifact.js, session.js)
 **Client handlers:** `public/modules/socket-handlers.js`
 **Event router:** `server/socket.js`
 
@@ -17,6 +17,8 @@
 | `artifact-array-op` | `{ roomId, artifactId, op: {type, path, value?, toPath?} }` | Array ops: `insert` / `remove` / `move`. See [interactivity.md](interactivity.md). |
 | `execute-canvas-action` | `{ roomId, canvasAction }` | Execute Claude's suggested canvas action. |
 | `delete-artifact` | `{ roomId, artifactId }` | Delete artifact from room. Broadcasts `artifact-deleted` to all users. |
+| `import-session` | `{ userName, artifacts, messages? }` | Create new room with imported artifacts/messages. Response: `room-joined`. |
+| `import-to-room` | `{ roomId, artifacts }` | Add imported artifacts to existing room. Response: `artifact-created` per artifact + `import-complete`. |
 
 ## Server → Client
 
@@ -36,6 +38,8 @@
 | `artifact-moved` | `{ artifactId, position }` | Position sync from other user. |
 | `artifact-deleted` | `{ artifactId }` | Artifact removed — delete card from canvas. |
 | `generation-error` | `{ roomId, message }` | Error (sent to requesting user only). |
+| `import-error` | `{ message }` | Session import failed (invalid file, room not found). |
+| `import-complete` | `{ count }` | Artifacts successfully imported into existing room. |
 
 ## In-Memory Data Model
 

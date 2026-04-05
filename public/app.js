@@ -8,6 +8,7 @@ import { initCanvas } from './modules/canvas.js';
 import { initVizPicker } from './modules/viz-picker.js';
 import { initMentions } from './modules/mentions.js';
 import { initSocketHandlers } from './modules/socket-handlers.js';
+import { initSession } from './modules/session.js';
 
 // Initialize mermaid
 if (typeof mermaid !== 'undefined') {
@@ -21,6 +22,7 @@ initCanvas();
 initVizPicker();
 initMentions();
 initSocketHandlers();
+initSession();
 
 // Connect socket AFTER all handlers registered, agents loaded (best-effort)
 agentsReady.finally(() => {

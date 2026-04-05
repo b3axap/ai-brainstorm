@@ -27,6 +27,7 @@ server/
     room.js            — join-room, disconnect, room lifecycle
     chat.js            — send-message, file validation, streaming trigger
     artifact.js        — generate, move, delete, patch, array-op, actions
+    session.js         — import-session (new room), import-to-room (existing)
   claude/
     client.js          — Anthropic SDK wrapper, lazy init, concurrency
     chat-analysis.js   — handleChatAnalysis (prompt building + streaming)
@@ -48,6 +49,7 @@ public/
     canvas.js          — Artifact cards, actions, drag, expand popup, pan/zoom
     viz-picker.js      — Visualization picker modal
     mentions.js        — @ mention autocomplete
+    session.js         — Export/import session (download JSON, file upload)
     socket-handlers.js — All socket.on event handlers
 ```
 
@@ -60,6 +62,7 @@ public/
 | **Interactivity system** | [`docs/interactivity.md`](docs/interactivity.md) | Editing renderers, data-attribute protocol, InteractiveEngine |
 | **Design system** | [`docs/design-system.md`](docs/design-system.md) | CSS changes, styling, Figma reference, accessibility, animations, component states, keyboard shortcuts, feedback states |
 | **Socket.IO API** | [`docs/socket-api.md`](docs/socket-api.md) | Client-server communication, event payloads, data model |
+| **Testing** | [`docs/testing.md`](docs/testing.md) | Running tests, adding tests, test structure, what's covered |
 
 ## Agent Catalog (15 agents)
 
