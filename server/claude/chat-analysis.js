@@ -87,15 +87,15 @@ Update memory on the FIRST message (set topic), and whenever goals, decisions, o
 JSON BLOCK (LAST thing in your response, on its own line):
 All fields are OPTIONAL — include only what's relevant:
 - "questions": array of question objects (with "q" + "options") or plain strings
-- "suggest": array of 2-3 agent IDs — when you think it's time to visualize
+- "suggest": array of 2-3 objects with "type" (agent ID) and "brief" (1-sentence description of what THIS visualization would contain based on the conversation, max 15 words, in the user's language)
 - "offer_canvas": true — include alongside "suggest" to show the visualization picker
 - "canvas_action": object — only for explicit canvas commands
 - "memory_update": object — update session memory with new facts (topic, goals, keyDecisions, openQuestions, participants)
 
 Examples:
-{"suggest": ["mindmap", "swot"], "offer_canvas": true, "memory_update": {"topic": "Food delivery app", "goals": ["MVP in 2 months"]}}
-{"suggest": ["mindmap", "table"], "offer_canvas": true}
-{"questions": [{"q": "Who is this for?", "options": ["B2B", "B2C", "Both"]}], "suggest": ["mindmap", "pros_cons"], "offer_canvas": true}
+{"suggest": [{"type": "mindmap", "brief": "Core breakdown: target audience, features, monetization, tech stack"}, {"type": "swot", "brief": "UX strengths, monetization weaknesses, market opportunities"}], "offer_canvas": true, "memory_update": {"topic": "Food delivery app", "goals": ["MVP in 2 months"]}}
+{"suggest": [{"type": "mindmap", "brief": "Idea structure: key components and connections"}, {"type": "table", "brief": "Feature comparison across 3 competitor apps"}], "offer_canvas": true}
+{"questions": [{"q": "Who is this for?", "options": ["B2B", "B2C", "Both"]}], "suggest": [{"type": "mindmap", "brief": "Business model breakdown"}, {"type": "pros_cons", "brief": "B2B vs B2C tradeoffs"}], "offer_canvas": true}
 {"canvas_action": {"intent": "create", "artifact_type": "mindmap"}}
 
 Rules:
@@ -139,7 +139,9 @@ Rules:
     if (jsonBlock) {
       try {
         const parsed = JSON.parse(jsonBlock);
-        suggestedTypes = parsed.suggest || [];
+        suggestedTypes = (parsed.suggest || []).map(s =>
+          typeof s === 'string' ? { type: s, brief: '' } : s
+        );
         clarifyQuestions = parsed.questions || [];
         offerCanvas = parsed.offer_canvas || false;
         canvasAction = parsed.canvas_action || null;

@@ -5,6 +5,7 @@ const { handleImportSession, handleImportToRoom } = require('./handlers/session'
 const {
   handleGenerateArtifact,
   handleMoveArtifact,
+  handleResizeArtifact,
   handleArtifactAction,
   handleDataPatch,
   handleArrayOp,
@@ -20,6 +21,7 @@ function initSocket(io) {
     socket.on('send-message', (data) => handleSendMessage(socket, io, data));
     socket.on('generate-artifact', (data) => handleGenerateArtifact(socket, io, data));
     socket.on('move-artifact', (data) => handleMoveArtifact(socket, io, data));
+    socket.on('resize-artifact', (data) => handleResizeArtifact(socket, io, data));
     socket.on('artifact-action', (data) => handleArtifactAction(socket, io, data));
     socket.on('artifact-data-patch', (data) => handleDataPatch(socket, io, data));
     socket.on('artifact-array-op', (data) => handleArrayOp(socket, io, data));

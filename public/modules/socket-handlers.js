@@ -153,24 +153,74 @@ export function initSocketHandlers() {
 
       const quickBtns = document.createElement('div');
       quickBtns.className = 'suggest-buttons';
-      suggestedTypes.forEach(typeId => {
+      suggestedTypes.forEach(suggestion => {
+        const typeId = suggestion.type || suggestion;
+        const brief = suggestion.brief || '';
         const agent = state.agents.find(a => a.id === typeId);
         if (!agent) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'suggest-btn-wrapper';
+
         const btn = document.createElement('button');
-        btn.className = 'suggest-btn';
+        btn.className = 'suggest-btn' + (brief ? ' has-brief' : '');
         btn.dataset.agentType = typeId;
-        btn.innerHTML = `${agent.icon} ${agent.name}`;
-        quickBtns.appendChild(btn);
+        btn.dataset.brief = brief;
+        btn.innerHTML = `<span class="suggest-btn-main">${agent.icon} ${agent.name}</span>`
+          + (brief ? `<span class="suggest-btn-brief">${escHtml(brief)}</span>` : '');
+        wrapper.appendChild(btn);
+
+        if (brief) {
+          const editBtn = document.createElement('button');
+          editBtn.className = 'suggest-edit-btn';
+          editBtn.title = 'Edit before generating';
+          editBtn.textContent = '\u270F\uFE0F';
+          editBtn.onclick = (e) => {
+            e.stopPropagation();
+            const editArea = document.createElement('div');
+            editArea.className = 'suggest-edit-inline';
+            editArea.innerHTML = `
+              <textarea class="suggest-edit-textarea" rows="2">${escHtml(brief)}</textarea>
+              <div class="suggest-edit-actions">
+                <button class="suggest-confirm-btn">${agent.icon} Generate</button>
+                <button class="suggest-cancel-btn">Cancel</button>
+              </div>
+            `;
+            wrapper.replaceWith(editArea);
+            const textarea = editArea.querySelector('.suggest-edit-textarea');
+            textarea.focus();
+            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+            editArea.querySelector('.suggest-confirm-btn').onclick = () => {
+              const customPrompt = textarea.value.trim();
+              editArea.innerHTML = `<div class="suggest-btn generating"><span class="auto-spinner"></span> ${agent.name}...</div>`;
+              socket.emit('generate-artifact', {
+                roomId: state.roomId, type: typeId,
+                customPrompt: customPrompt || undefined
+              });
+              showToast(`Generating ${agent.name}...`);
+            };
+            editArea.querySelector('.suggest-cancel-btn').onclick = () => {
+              editArea.replaceWith(wrapper);
+            };
+          };
+          wrapper.appendChild(editBtn);
+        }
+
+        quickBtns.appendChild(wrapper);
       });
       quickBtns.onclick = (e) => {
         const btn = e.target.closest('.suggest-btn');
         if (!btn || btn.disabled) return;
         const typeId = btn.dataset.agentType;
+        const brief = btn.dataset.brief || '';
         const agent = state.agents.find(a => a.id === typeId);
         if (!agent) return;
         btn.innerHTML = `<span class="auto-spinner"></span> ${agent.name}...`;
         btn.disabled = true;
-        socket.emit('generate-artifact', { roomId: state.roomId, type: typeId });
+        socket.emit('generate-artifact', {
+          roomId: state.roomId, type: typeId,
+          customPrompt: brief || undefined
+        });
         showToast(`Generating ${agent.name}...`);
       };
       canvasOffer.appendChild(quickBtns);
@@ -331,6 +381,19 @@ export function initSocketHandlers() {
     }
     const art = state.artifacts.find(a => a.id === artifactId);
     if (art) art.position = position;
+  });
+
+  socket.on('artifact-resized', ({ artifactId, size }) => {
+    if (!size) return;
+    const card = document.getElementById(`artifact-${artifactId}`);
+    if (card) {
+      card.style.width = size.w + 'px';
+      card.style.height = size.h + 'px';
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
+    }
+    const art = state.artifacts.find(a => a.id === artifactId);
+    if (art) art.size = size;
   });
 
   socket.on('artifact-deleted', ({ artifactId }) => {

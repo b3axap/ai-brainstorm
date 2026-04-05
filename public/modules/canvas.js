@@ -21,6 +21,12 @@ export function renderArtifactCard(artifact) {
   card.setAttribute('aria-label', `${artifact.icon || ''} ${artifact.title}`);
   card.style.left = artifact.position.x + 'px';
   card.style.top = artifact.position.y + 'px';
+  if (artifact.size) {
+    card.style.width = artifact.size.w + 'px';
+    card.style.height = artifact.size.h + 'px';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+  }
 
   card.innerHTML = `
     <div class="artifact-actions">
@@ -69,8 +75,14 @@ export function renderArtifactCard(artifact) {
     }
   }
 
+  // Resize handle
+  const resizeHandle = document.createElement('div');
+  resizeHandle.className = 'artifact-resize-handle';
+  card.appendChild(resizeHandle);
+
   setupArtifactActions(card, artifact);
   setupDrag(card, artifact);
+  setupResize(card, artifact);
 
   // Setup interactive engine
   if (window.InteractiveEngine) {
@@ -256,6 +268,49 @@ function setupDrag(card, artifact) {
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   };
+}
+
+// --- Resize ---
+function setupResize(card, artifact) {
+  const handle = card.querySelector('.artifact-resize-handle');
+  if (!handle) return;
+
+  const MIN_W = 280, MAX_W = 1200, MIN_H = 180, MAX_H = 900;
+  let startX, startY, origW, origH;
+
+  function onMouseMove(e) {
+    const scale = window._canvasPanZoom ? window._canvasPanZoom.getScale() : 1;
+    const newW = Math.min(MAX_W, Math.max(MIN_W, origW + (e.clientX - startX) / scale));
+    const newH = Math.min(MAX_H, Math.max(MIN_H, origH + (e.clientY - startY) / scale));
+    card.style.width = newW + 'px';
+    card.style.height = newH + 'px';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+  }
+
+  function onMouseUp() {
+    card.classList.remove('resizing');
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    const size = {
+      w: parseInt(card.style.width) || origW,
+      h: parseInt(card.style.height) || origH,
+    };
+    artifact.size = size;
+    socket.emit('resize-artifact', { roomId: state.roomId, artifactId: artifact.id, size });
+  }
+
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    card.classList.add('resizing');
+    startX = e.clientX;
+    startY = e.clientY;
+    origW = card.offsetWidth;
+    origH = card.offsetHeight;
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
 }
 
 // --- Expand Popup ---

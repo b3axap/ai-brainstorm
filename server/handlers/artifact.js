@@ -96,6 +96,18 @@ function handleArrayOp(socket, io, { roomId, artifactId, op }) {
   });
 }
 
+function handleResizeArtifact(socket, io, { roomId, artifactId, size }) {
+  const room = store.getRoom(roomId);
+  if (!room) return;
+  const art = room.artifacts.find(a => a.id === artifactId);
+  if (!art || !size) return;
+  art.size = {
+    w: Math.min(1200, Math.max(280, size.w)),
+    h: Math.min(900, Math.max(180, size.h)),
+  };
+  socket.to(roomId).emit('artifact-resized', { artifactId, size: art.size });
+}
+
 function handleDeleteArtifact(socket, io, { roomId, artifactId }) {
   const room = store.getRoom(roomId);
   if (!room) return;
@@ -131,6 +143,7 @@ function handleExecuteCanvasAction(socket, io, { roomId, canvasAction }) {
 module.exports = {
   handleGenerateArtifact,
   handleMoveArtifact,
+  handleResizeArtifact,
   handleArtifactAction,
   handleDataPatch,
   handleArrayOp,
