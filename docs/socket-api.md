@@ -1,5 +1,9 @@
 # Socket.IO Event Contract
 
+**Server handlers:** `server/handlers/` (room.js, chat.js, artifact.js)
+**Client handlers:** `public/modules/socket-handlers.js`
+**Event router:** `server/socket.js`
+
 ## Client → Server
 
 | Event | Payload | Description |
@@ -34,6 +38,8 @@
 | `generation-error` | `{ roomId, message }` | Error (sent to requesting user only). |
 
 ## In-Memory Data Model
+
+**Source:** `server/data/memory.js`
 
 ```js
 rooms[roomId] = {
