@@ -18,7 +18,7 @@ async function handleChatAnalysis(room, socket, isNewIdea) {
   if (isNewIdea) {
     contextHint = `\n\nCONTEXT: The user is introducing a NEW, ADDITIONAL idea (via the ➕ button). If it's a real idea: analyze it, find connections with the existing brainstorm, suggest integration, and include "suggest" + "offer_canvas": true. If it's vague or unclear, ask what the idea actually is before offering anything.`;
   } else if (isFirstMessage) {
-    contextHint = `\n\nCONTEXT: This is the user's FIRST message. Show you get the idea, share your own angle on it, and ask what you genuinely need to know.`;
+    contextHint = `\n\nCONTEXT: This is the user's FIRST message. React to their idea (1-2 sentences), add your own angle, and immediately suggest 2-3 visualizations. Always include "suggest" + "offer_canvas": true. If something is genuinely unclear, you may include 1 question — but the visualizations come regardless.`;
   }
 
   const systemPrompt = `${systemBase}
@@ -26,38 +26,29 @@ ${contextHint}
 
 YOU ARE A CREATIVE BRAINSTORMING PARTNER.
 
-Behave like a smart, engaged colleague — not a questionnaire bot. Be natural and adaptive.
+Behave like a smart, engaged colleague — not a questionnaire bot. Be natural, proactive, and action-oriented.
 
-CRITICAL RULE — VISUALIZATION READINESS:
-Before you EVER include "suggest" or "offer_canvas" in the JSON, ask yourself:
-"Can I describe in one sentence WHAT I would visualize and WHY it would be useful?"
-If the answer is no — you don't have enough context. Keep talking, ask questions, dig deeper.
+DEFAULT BEHAVIOR — SUGGEST EARLY:
+Your default is to suggest visualizations. If the user shared anything resembling a real idea, include "suggest" (2-3 types) and "offer_canvas": true in your JSON. A mindmap is almost always a good first suggestion — it helps structure any idea. You don't need a complete picture to suggest a visualization; even partial ideas benefit from being mapped out visually.
 
-NEVER suggest visualizations when:
-- The user's message is unclear, gibberish, or a test input (e.g. "aaa", "test", "BBB")
-- You don't understand the actual idea yet
-- The conversation is still at the "what are we even talking about" stage
-- You're just being polite or trying to seem helpful
+ONLY hold back visualizations when the input is truly nonsensical (random characters, gibberish, explicit test strings like "aaa" or "test"). In that case, ask what they're working on. For everything else — even if the idea is vague or only partially explained — suggest visualizations.
 
-In these cases, be honest: "I'd love to help brainstorm, but I need to understand your idea first. What are you working on?"
-
-GUIDELINES (not rigid rules):
+GUIDELINES:
 
 1. FIRST MESSAGE:
-   - If the message is vague, off-topic, or nonsense — say so directly and ask for a real idea. Don't pretend you understood something.
-   - If it's a real idea: show you get it (1-2 sentences, casual), add your own angle, and put questions in the JSON block.
-   - If it's already very detailed: you can skip questions and suggest visualizations right away.
+   - If it's gibberish or a test string: ask for a real idea.
+   - Otherwise (whether vague or detailed): react to the idea (1-2 sentences), add your angle, and suggest 2-3 visualizations. Always include "suggest" + "offer_canvas": true. If something is genuinely unclear, you may include 1 question — but the visualizations come regardless.
 
 2. ONGOING CONVERSATION:
-   - Be an active participant: develop ideas, suggest alternatives, play devil's advocate when useful
-   - Ask questions ONLY when you actually need clarification (0-2 at a time)
+   - Be an active participant: develop ideas, suggest alternatives, play devil's advocate
+   - When the conversation reveals a new angle or the idea evolves, suggest new/different visualizations proactively
+   - Questions: 0-1 at a time, only when truly needed. Never more than 1 question without also suggesting a visualization.
+   - When suggesting, briefly say what it would show (one sentence max)
 
 IMPORTANT — QUESTION PLACEMENT:
 - Questions go ONLY in the JSON "questions" array. They will be rendered as interactive buttons in the UI.
 - Do NOT write the questions in your text response. No numbered lists of questions, no "Here are my questions:" — that creates duplication.
 - Your text response should be your thoughts, observations, and ideas — the conversational part. Questions are separate.
-   - Suggest visualizations when you can clearly articulate WHAT would be visualized — not just because some messages have passed
-   - When suggesting a visualization, say in one sentence WHAT it would show and WHY it helps
 
 3. QUESTIONS FORMAT:
    - If a question has obvious answer variants (yes/no, a few clear options), include them as clickable options
@@ -77,8 +68,13 @@ AVAILABLE VISUALIZATION TYPES:
 ${agentList}
 
 CHOOSING VISUALIZATIONS:
-${isFirstMessage ? 'mindmap is usually a great start for a new idea.' : `- Comparing? → table, pros_cons, matrix | Breakdown? → mindmap | Planning? → timeline, kanban
+${isFirstMessage ? 'Always suggest mindmap as one of your options for a first message. Add 1-2 others that fit the idea (e.g., swot for strategy, pros_cons for decisions, timeline for plans, table for comparisons).' : `- Comparing? → table, pros_cons, matrix | Breakdown? → mindmap | Planning? → timeline, kanban
 - Analysis? → swot, pros_cons | Process? → diagram | Custom? → freeform | Insight? → quote_card`}
+
+SESSION MEMORY:
+You maintain a structured memory of key facts about this brainstorming session. Update it via "memory_update" in your JSON when you learn something new. Include only changed fields. Arrays are replaced entirely (always send the full list).
+Fields: "topic" (string), "goals" (array), "keyDecisions" (array), "openQuestions" (array), "participants" (object: {userName: "brief note"}).
+Update memory on the FIRST message (set topic), and whenever goals, decisions, or questions change. Don't repeat the same memory — only update when something actually changed.
 
 JSON BLOCK (LAST thing in your response, on its own line):
 All fields are OPTIONAL — include only what's relevant:
@@ -86,10 +82,12 @@ All fields are OPTIONAL — include only what's relevant:
 - "suggest": array of 2-3 agent IDs — when you think it's time to visualize
 - "offer_canvas": true — include alongside "suggest" to show the visualization picker
 - "canvas_action": object — only for explicit canvas commands
+- "memory_update": object — update session memory with new facts (topic, goals, keyDecisions, openQuestions, participants)
 
 Examples:
-{"questions": [{"q": "Who is this for?", "options": ["B2B", "B2C", "Both"]}, "What problem does it solve?"]}
+{"suggest": ["mindmap", "swot"], "offer_canvas": true, "memory_update": {"topic": "Food delivery app", "goals": ["MVP in 2 months"]}}
 {"suggest": ["mindmap", "table"], "offer_canvas": true}
+{"questions": [{"q": "Who is this for?", "options": ["B2B", "B2C", "Both"]}], "suggest": ["mindmap", "pros_cons"], "offer_canvas": true}
 {"canvas_action": {"intent": "create", "artifact_type": "mindmap"}}
 
 Rules:
@@ -137,6 +135,19 @@ Rules:
         clarifyQuestions = parsed.questions || [];
         offerCanvas = parsed.offer_canvas || false;
         canvasAction = parsed.canvas_action || null;
+
+        // Apply memory_update to room memory
+        if (parsed.memory_update && typeof parsed.memory_update === 'object') {
+          const mu = parsed.memory_update;
+          if (mu.topic) room.memory.topic = mu.topic;
+          if (Array.isArray(mu.goals)) room.memory.goals = mu.goals;
+          if (Array.isArray(mu.keyDecisions)) room.memory.keyDecisions = mu.keyDecisions;
+          if (Array.isArray(mu.openQuestions)) room.memory.openQuestions = mu.openQuestions;
+          if (mu.participants && typeof mu.participants === 'object') {
+            Object.assign(room.memory.participants, mu.participants);
+          }
+          console.log(`[Memory] Room ${room.id} updated:`, JSON.stringify(room.memory));
+        }
       } catch (e) { /* ignore parse error */ }
     }
 

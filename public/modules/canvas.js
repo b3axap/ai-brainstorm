@@ -1,9 +1,9 @@
 // Canvas: artifact cards, actions, drag, expand popup, pan/zoom, resize
 import { state, socket } from './state.js';
-import { escHtml, showToast } from './utils.js';
+import { escHtml, showToast, trapFocus } from './utils.js';
 
 // Expand popup state
-let expandState = { artifactId: null, engine: null };
+let expandState = { artifactId: null, engine: null, releaseFocusTrap: null };
 
 export function initCanvas() {
   initResizeHandle();
@@ -285,6 +285,7 @@ function openArtifactExpand(artifactId) {
   }
 
   modal.classList.add('active');
+  expandState.releaseFocusTrap = trapFocus(modal);
   setupExpandToolbar(art);
   setupExpandAskBar(art);
 }
@@ -292,6 +293,7 @@ function openArtifactExpand(artifactId) {
 export function closeArtifactExpand() {
   const modal = document.getElementById('artifactExpandModal');
   modal.classList.remove('active');
+  if (expandState.releaseFocusTrap) { expandState.releaseFocusTrap(); expandState.releaseFocusTrap = null; }
   if (expandState.engine) {
     expandState.engine.destroy();
     expandState.engine = null;

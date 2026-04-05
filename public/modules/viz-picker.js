@@ -1,6 +1,8 @@
 // Visualization picker modal
 import { state, socket } from './state.js';
-import { escHtml, showToast } from './utils.js';
+import { escHtml, showToast, trapFocus } from './utils.js';
+
+let _releaseFocusTrap = null;
 
 export function initVizPicker() {
   document.getElementById('vizCancelBtn').onclick = closeVizPicker;
@@ -51,12 +53,15 @@ export function openVizPicker(preSelected) {
   document.getElementById('vizCustomCheck').checked = false;
   document.getElementById('vizCustomInput').value = '';
   document.getElementById('vizCustomInput').disabled = true;
-  document.getElementById('vizPickerModal').classList.add('active');
+  const modal = document.getElementById('vizPickerModal');
+  modal.classList.add('active');
+  _releaseFocusTrap = trapFocus(modal);
   updateVizGenerateBtn();
 }
 
 function closeVizPicker() {
   document.getElementById('vizPickerModal').classList.remove('active');
+  if (_releaseFocusTrap) { _releaseFocusTrap(); _releaseFocusTrap = null; }
 }
 
 function populateVizGrid() {

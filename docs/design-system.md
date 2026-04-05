@@ -18,7 +18,7 @@
 |-------|-----|-------|
 | `--text` | `#e4e7f0` | Primary text, headings |
 | `--text2` | `#9ea3b5` | Labels, secondary text |
-| Placeholder | `#6a7086` | Input placeholder (no opacity) |
+| `--placeholder` | `#6a7086` | Input placeholder (no opacity) |
 
 ### Accents
 | Token | Hex | Usage |
@@ -31,54 +31,86 @@
 | `--red` | `#ff6b6b` | Errors |
 | `--blue` | `#74b9ff` | Info |
 
+### Accent Alpha Overlays (CSS variables)
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--accent-a10` | `rgba(108,92,231,.1)` | Hover backgrounds, subtle tints |
+| `--accent-a15` | `rgba(108,92,231,.15)` | Selected states |
+| `--accent-a20` | `rgba(108,92,231,.2)` | Active/pressed states |
+| `--accent-a25` | `rgba(108,92,231,.25)` | Strong hover |
+| `--accent-a30` | `rgba(108,92,231,.3)` | Focus rings |
+| `--green-a10` | `rgba(0,206,201,.12)` | Green tinted backgrounds |
+| `--green-a25` | `rgba(0,184,148,.25)` | Green hover |
+
 ## Typography
 
 Font: `Inter` (Figma) / `Segoe UI, system-ui` (web)
 
-| Role | Size | Weight |
-|------|------|--------|
-| Page title | 28px | 700 |
-| Section title | 16px | 600 |
-| Body | 13px | 400 |
-| Label | 11px | 600, uppercase, 0.8px spacing |
-| Caption | 10px | 400 |
+| Token | Size | Weight | Usage |
+|-------|------|--------|-------|
+| `--text-2xl` | 28px | 700 | Page title |
+| `--text-xl` | 16px | 600 | Section title |
+| `--text-lg` | 14px | 400 | Subtitle |
+| `--text-base` | 13px | 400 | Body text |
+| `--text-md` | 12px | 400 | Suggest buttons, small text |
+| `--text-sm` | 11px | 600, uppercase, 0.8px spacing | Labels |
+| `--text-xs` | 10px | 400 | Caption |
 
 ## Spacing (base: 4px)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| xs | 4px | Tight gaps |
-| sm | 6px | Mini-chat |
-| md | 8px | Button/grid gaps |
-| lg | 10px | Card padding |
-| xl | 12px | Header padding |
-| 2xl | 16px | Message gaps |
-| 3xl-5xl | 20-40px | Major padding |
+| `--space-xs` | 4px | Tight gaps |
+| `--space-sm` | 6px | Mini-chat gaps |
+| `--space-md` | 8px | Button/grid gaps |
+| `--space-lg` | 12px | Header padding |
+| `--space-xl` | 16px | Message gaps |
+| `--space-2xl` | 20px | Section padding |
+| `--space-3xl` | 24px | Modal padding |
+| `--space-4xl` | 32px | Large spacing |
+| `--space-5xl` | 40px | Landing card padding |
 
 ## Border Radius
 
-| Value | Usage |
-|-------|-------|
-| 4px | Message bubble corners |
-| 6px | Room code badge |
-| 8px | Buttons, inputs |
-| 10px | Artifact cards (`--radius`) |
-| 12px | Modals, message bubbles |
-| 16px | Landing card |
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--radius-xs` | 4px | Message bubble corners, badges |
+| `--radius-sm` | 6px | Room code badge, code blocks |
+| `--radius-md` | 8px | Buttons, inputs |
+| `--radius-lg` | 10px | Artifact cards (`--radius` alias) |
+| `--radius-xl` | 12px | Modals, message bubbles |
+| `--radius-2xl` | 16px | Landing card, pills |
 
-Shadow: `0 4px 24px rgba(0, 0, 0, 0.4)`
+## Shadows
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--shadow` | `0 4px 24px rgba(0,0,0,.4)` | Cards, modals |
+| `--shadow-lg` | `0 8px 32px rgba(0,0,0,.5)` | Hover elevation |
+| `--shadow-xl` | `0 24px 80px rgba(0,0,0,.6)` | Expand popup |
+
+## Easing & Transitions
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--ease-out` | `ease-out` | Entry animations |
+| `--ease-in-out` | `ease-in-out` | Pulsing, typing |
+| `--duration-fast` | `0.1s` | Micro interactions |
+| `--duration-normal` | `0.15s` | Buttons, inputs |
+| `--duration-smooth` | `0.2s` | Cards, modals |
+| `--duration-slow` | `0.3s` | Toast, mobile panel |
 
 ## Components
 
 ### Buttons
-- **Default** `.btn`: `--surface2` bg, `--border` border, 8px radius
+- **Default** `.btn`: `--surface2` bg, `--border` border, `--radius-md` (8px)
 - **Primary** `.btn-primary`: `--accent` bg, white text, hover `#7c6ef0`
-- **Suggest** `.suggest-btn`: transparent bg, `--accent` border
-- **Disabled**: opacity 0.5, no pointer events
+- **Suggest** `.suggest-btn`: `--accent-a10` bg, `--accent` border
+- **Disabled**: opacity 0.5, bg `--surface3`, border `--border`, color `--text2`, `cursor: not-allowed`
 
 ### Inputs
-- Default: `--surface2` bg, `--border` border, 8px radius
-- Focus: border `--accent` + box-shadow ring `rgba(108,92,231,.3)`
+- Default: `--surface2` bg, `--border` border, `--radius-md` (8px)
+- Focus: border `--accent` + box-shadow ring `--accent-a30`
 - Focus-visible: `outline: 2px solid --accent2`, 2px offset
 
 ### Cards
@@ -88,12 +120,15 @@ Shadow: `0 4px 24px rgba(0, 0, 0, 0.4)`
 ## Accessibility (WCAG 2.1 AA)
 
 - `--text2` (#9ea3b5): 4.5:1+ contrast on surfaces
-- Placeholder (#6a7086): 3:1+ contrast
+- Placeholder (`--placeholder` #6a7086): 3:1+ contrast
 - Focus-visible outlines on all interactive elements
 - Semantic HTML landmarks: `<header>`, `<main>`, `<aside>`, `<nav>`
 - ARIA: `aria-label`, `aria-live="polite"`, `role="dialog" aria-modal="true"`
 - Touch targets: 44px min on mobile
 - Resize handle: `role="separator"`, keyboard-accessible
+- **Focus trap**: modals (expand popup, viz picker) trap Tab/Shift+Tab within dialog
+- **`prefers-reduced-motion`**: all animations and transitions suppressed when user prefers reduced motion
+- **Firefox scrollbar**: `scrollbar-color` and `scrollbar-width` tokens applied globally
 
 ## Figma Frames
 
@@ -328,11 +363,11 @@ Selected states: `.clarify-option-btn.selected`, `.viz-card.selected`, `.viz-ref
 
 > **Partially in Figma** (2 frames: Chat View, Canvas View). Breakpoints and transitions not shown.
 
-### Breakpoint
+### Breakpoints
 
-- **< 768px**: Mobile layout activates
-- Bottom tab bar appears: 💬 Chat / 🎨 Canvas
-- Split-view replaced by full-screen panels with tab switching
+- **< 768px**: Mobile layout — full-screen panels with bottom tab bar (💬 Chat / 🎨 Canvas)
+- **769px–1024px**: Tablet — narrower chat panel (280px), 3-column viz grid, 95vw expand modal
+- **> 1024px**: Desktop — full split-view (350px chat + canvas)
 
 ### Tab Transition
 

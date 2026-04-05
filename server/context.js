@@ -7,11 +7,28 @@ function buildContext(room, socketId) {
     `- [${a.type}] "${a.title}" (id:${a.id}) by ${a.author}`
   ).join('\n') || 'none yet';
 
+  // Build session memory section if populated
+  let memorySection = '';
+  if (room.memory && room.memory.topic) {
+    const parts = [`Topic: ${room.memory.topic}`];
+    if (room.memory.goals.length > 0)
+      parts.push(`Goals: ${room.memory.goals.join('; ')}`);
+    if (room.memory.keyDecisions.length > 0)
+      parts.push(`Key decisions: ${room.memory.keyDecisions.join('; ')}`);
+    if (room.memory.openQuestions.length > 0)
+      parts.push(`Open questions: ${room.memory.openQuestions.join('; ')}`);
+    const participantEntries = Object.entries(room.memory.participants || {});
+    if (participantEntries.length > 0)
+      parts.push(`Participants: ${participantEntries.map(([name, note]) => `${name}: ${note}`).join('; ')}`);
+    memorySection = `\n\nSESSION MEMORY (key facts about this brainstorm — use this context, don't re-ask what you already know):\n${parts.join('\n')}`;
+  }
+
   const systemBase = `You are an AI brainstorming partner in a collaborative room.
 Room ID: ${room.id}
 Active users: ${userNames}
 Existing artifacts in this session:
 ${artifactList}
+${memorySection}
 
 Your job is to help users develop their ideas, make connections between different perspectives, and suggest useful visualizations.`;
 

@@ -18,7 +18,14 @@ function handleJoinRoom(socket, io, { roomId, userName }) {
       messages: [],
       artifacts: [],
       users: [],
-      userChats: {}
+      userChats: {},
+      memory: {
+        topic: '',
+        goals: [],
+        keyDecisions: [],
+        openQuestions: [],
+        participants: {}
+      }
     };
     store.createRoom(room);
   }
