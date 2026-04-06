@@ -7,7 +7,8 @@ function getClient() {
   if (!anthropic) {
     const Anthropic = require('@anthropic-ai/sdk');
     const AnthropicClass = Anthropic.default || Anthropic;
-    anthropic = new AnthropicClass();
+    const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
+    anthropic = new AnthropicClass({ apiKey: apiKey || undefined });
   }
   return anthropic;
 }
