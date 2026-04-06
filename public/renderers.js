@@ -36,7 +36,17 @@ function renderArtifact(type, data, container) {
 
 // --- MIND MAP ---
 function renderMindMap(data, container) {
+  // Try to extract from nested wrapper (e.g. {mindmap: {center, branches}})
+  if (!data.center && !data.branches && typeof data === 'object') {
+    const inner = data.mindmap || data.mind_map || data.data;
+    if (inner && (inner.center || inner.branches)) {
+      data = inner;
+    }
+  }
+  // Fallback: use title as center if center is missing
+  if (!data.center && data.title) data.center = data.title;
   if (!data.center || !data.branches) {
+    console.warn('[renderMindMap] Invalid data:', JSON.stringify(data).slice(0, 200));
     container.innerHTML = '<div style="color:var(--text2);padding:20px;">Invalid mind map data</div>';
     return;
   }

@@ -7,6 +7,7 @@ const {
   handleMoveArtifact,
   handleResizeArtifact,
   handleArtifactAction,
+  handleCancelArtifactAction,
   handleDataPatch,
   handleArrayOp,
   handleDeleteArtifact,
@@ -23,6 +24,7 @@ function initSocket(io) {
     socket.on('move-artifact', (data) => handleMoveArtifact(socket, io, data));
     socket.on('resize-artifact', (data) => handleResizeArtifact(socket, io, data));
     socket.on('artifact-action', (data) => handleArtifactAction(socket, io, data));
+    socket.on('cancel-artifact-action', () => handleCancelArtifactAction(socket));
     socket.on('artifact-data-patch', (data) => handleDataPatch(socket, io, data));
     socket.on('artifact-array-op', (data) => handleArrayOp(socket, io, data));
     socket.on('delete-artifact', (data) => handleDeleteArtifact(socket, io, data));

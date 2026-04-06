@@ -15,7 +15,7 @@ const FREEFORM_DATA_INSTRUCTIONS = `The current data is a JSON object with "titl
 You MUST return valid JSON: {"title": "...", "html": "<!DOCTYPE html><html>...</html>"}
 The "html" field must contain the COMPLETE, WORKING HTML document with all <style> and <script> inline. Do NOT omit or truncate any part.`;
 
-async function handleArtifactExpand(room, artifact, socket, io) {
+async function handleArtifactExpand(room, artifact, socket, io, signal) {
   const agent = getAgent(artifact.type);
   if (!agent) return;
 
@@ -29,7 +29,7 @@ async function handleArtifactExpand(room, artifact, socket, io) {
     max_tokens: agent.maxTokens || config.claude.generationMaxTokens,
     system,
     messages: [{ role: 'user', content: 'Expand this visualization with more detail.' }]
-  });
+  }, { signal });
 
   const text = extractResponseText(response);
   if (!text) throw new Error('Empty response from Claude');
@@ -43,7 +43,7 @@ async function handleArtifactExpand(room, artifact, socket, io) {
   });
 }
 
-async function handleArtifactTransform(room, artifact, targetType, socket, io) {
+async function handleArtifactTransform(room, artifact, targetType, socket, io, signal) {
   const agent = getAgent(targetType);
   if (!agent) return;
 
@@ -55,7 +55,7 @@ async function handleArtifactTransform(room, artifact, targetType, socket, io) {
     max_tokens: agent.maxTokens || config.claude.generationMaxTokens,
     system,
     messages: [{ role: 'user', content: `Convert this ${artifact.type} into a ${targetType}.` }]
-  });
+  }, { signal });
 
   const text = extractResponseText(response);
   if (!text) throw new Error('Empty response from Claude');
@@ -78,7 +78,7 @@ async function handleArtifactTransform(room, artifact, targetType, socket, io) {
   io.to(room.id).emit('artifact-created', { roomId: room.id, artifact: newArtifact });
 }
 
-async function handleArtifactAsk(room, artifact, question, socket, io) {
+async function handleArtifactAsk(room, artifact, question, socket, io, signal) {
   const agent = getAgent(artifact.type);
   if (!agent) return;
 
@@ -92,7 +92,7 @@ async function handleArtifactAsk(room, artifact, question, socket, io) {
     max_tokens: agent.maxTokens || config.claude.generationMaxTokens,
     system,
     messages: [{ role: 'user', content: question }]
-  });
+  }, { signal });
 
   const text = extractResponseText(response);
   if (!text) throw new Error('Empty response from Claude');

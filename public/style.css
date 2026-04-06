@@ -484,7 +484,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .expand-ask-bar .input { flex: 1; }
 
 /* Expand popup loading overlay */
-.expand-loading { position: absolute; inset: 0; background: var(--overlay-bg); display: flex; align-items: center; justify-content: center; z-index: 10; border-radius: 0; }
+.expand-loading { position: absolute; inset: 0; background: var(--overlay-bg); display: flex; flex-direction: column; gap: var(--space-lg); align-items: center; justify-content: center; z-index: 10; border-radius: 0; }
+.expand-loading-cancel { padding: var(--space-sm) var(--space-xl); background: var(--surface2); color: var(--text2); border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-md); transition: background var(--duration-fast); }
+.expand-loading-cancel:hover { background: var(--surface3); color: var(--text); }
 
 /* Transform dropdown inside expand popup */
 .expand-transform-dropdown { position: absolute; top: 100%; left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow); padding: var(--space-xs); z-index: 600; min-width: 180px; max-height: 300px; overflow-y: auto; }

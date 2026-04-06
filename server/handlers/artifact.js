@@ -17,23 +17,43 @@ function handleMoveArtifact(socket, io, { roomId, artifactId, position }) {
   socket.to(roomId).emit('artifact-moved', { artifactId, position });
 }
 
+// Per-socket AbortController for cancellable artifact actions
+const activeArtifactActions = new Map();
+
+function handleCancelArtifactAction(socket) {
+  const ac = activeArtifactActions.get(socket.id);
+  if (ac) {
+    ac.abort();
+    activeArtifactActions.delete(socket.id);
+  }
+}
+
 async function handleArtifactAction(socket, io, { roomId, artifactId, action, payload }) {
   const room = store.getRoom(roomId);
   if (!room) return;
   const artifact = room.artifacts.find(a => a.id === artifactId);
   if (!artifact) return;
 
+  // Cancel any previous action for this socket
+  handleCancelArtifactAction(socket);
+  const ac = new AbortController();
+  activeArtifactActions.set(socket.id, ac);
+
   try {
+    const signal = ac.signal;
     if (action === 'expand') {
-      await handleArtifactExpand(room, artifact, socket, io);
+      await handleArtifactExpand(room, artifact, socket, io, signal);
     } else if (action === 'transform' && payload && payload.targetType) {
-      await handleArtifactTransform(room, artifact, payload.targetType, socket, io);
+      await handleArtifactTransform(room, artifact, payload.targetType, socket, io, signal);
     } else if (action === 'ask' && payload && payload.question) {
-      await handleArtifactAsk(room, artifact, payload.question, socket, io);
+      await handleArtifactAsk(room, artifact, payload.question, socket, io, signal);
     }
   } catch (error) {
+    if (error.name === 'AbortError') return; // Cancelled by user
     console.error(`Artifact action ${action} error:`, error.message);
     socket.emit('generation-error', { roomId, message: error.message });
+  } finally {
+    activeArtifactActions.delete(socket.id);
   }
 }
 
@@ -145,6 +165,7 @@ module.exports = {
   handleMoveArtifact,
   handleResizeArtifact,
   handleArtifactAction,
+  handleCancelArtifactAction,
   handleDataPatch,
   handleArrayOp,
   handleDeleteArtifact,

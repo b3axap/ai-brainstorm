@@ -522,7 +522,11 @@ function showExpandLoading() {
   if (body.querySelector('.expand-loading')) return;
   const overlay = document.createElement('div');
   overlay.className = 'expand-loading';
-  overlay.innerHTML = '<div class="gen-spinner"></div>';
+  overlay.innerHTML = '<div class="gen-spinner"></div><button class="expand-loading-cancel">Cancel</button>';
+  overlay.querySelector('.expand-loading-cancel').onclick = () => {
+    overlay.remove();
+    socket.emit('cancel-artifact-action', { roomId: state.roomId });
+  };
   body.appendChild(overlay);
 }
 
